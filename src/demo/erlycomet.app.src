@@ -12,8 +12,7 @@
     {applications, [kernel,
                     stdlib]},
     {included_applications, []},
-    {env, [{http_port, 3000},
-	       {docroot, "demo-docroot"}]},
+    {env, [{http_port, 3000}]},
     {mod, {erlycomet_app, []}} ]}.
     
      

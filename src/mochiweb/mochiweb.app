@@ -2,6 +2,7 @@
  [{description, "MochiMedia Web Server"},
   {vsn, "0.01"},
   {modules, [
+	     mochicode,
 	     mochihex,
 	     mochijson,
 	     mochiweb,
@@ -10,7 +11,6 @@
 	     mochiweb_echo,
 	     mochiweb_headers,
 	     mochiweb_http,
-	     mochiweb_multipart,
 	     mochiweb_request,
 	     mochiweb_response,
 	     mochiweb_socket_server,
@@ -20,4 +20,4 @@
   {registered, []},
   {mod, {mochiweb_app, []}},
   {env, []},
-  {applications, [kernel, stdlib]}]}.
+  {applications, [kernel, stdlib, crypto]}]}.

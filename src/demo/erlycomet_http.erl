@@ -49,7 +49,7 @@
 %% --------------------------------------------------------------------
 %% Internal exports
 %% --------------------------------------------------------------------
--export([loop/1]).
+-export([loop/1, loop/4]).
 
 
 %%--------------------------------------------------------------------
@@ -82,4 +82,12 @@ stop(Name) ->
 %% --------------------------------------------------------------------
 
 loop(Req) ->
-    Req:ok({"text/html", "erlycomet - not yet ..."}).
+	DocRoot = filename:join([filename:dirname(code:which(?MODULE)),"..", "demo-docroot"]),
+    loop(Req, Req:get(method), Req:get(path), DocRoot).
+
+
+loop(Req, 'GET', [$/ | Path], DocRoot) ->
+    Req:serve_file(Path, DocRoot).
+	
+	
+	
