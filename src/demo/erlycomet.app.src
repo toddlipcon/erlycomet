@@ -1,10 +1,11 @@
 {application, erlycomet,
   [
-    {description, "Erlang COMET Server"},
+    {description, "Erlang Comet Server"},
     {vsn, "0.1"},
     {modules, [erlycomet,
                erlycomet_sup,
                erlycomet_app,
+			   erlycomet_http,
                erlycomet_cluster,
                gen_server_cluster]},
     {registered, []},
