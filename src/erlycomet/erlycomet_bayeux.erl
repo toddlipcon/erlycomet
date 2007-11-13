@@ -49,13 +49,19 @@
 %% @end 
 %%--------------------------------------------------------------------
 handle([{"message", Msg}]) ->
-	Response = process_bayeux_msg(mochijson:decode(Msg)),
-	{ok, mochijson:encode(Response)};
+	case process_bayeux_msg(mochijson:decode(Msg)) of
+		{array,[chunked]} ->  % rsaccon: TODO better solution for initaliting chunked stuff
+			{continue, {200, [], chunked}};
+		Body ->
+			HResp = mochiweb_headers:make([]),
+		    HResp1 = mochiweb_headers:enter("Content-Type", "text/json" ,HResp),
+			{done, {200, HResp1, mochijson:encode(Body)}}  % Req:ok({"text/json", mochijson:encode(Body)});  
+	end;
 	
 handle(Other) ->
 	?D({"not_handled: ", Other}),
 	error.
-
+	
 
 %%====================================================================
 %% Internal functions
@@ -70,40 +76,45 @@ process_bayeux_msg({Type, Msgs}) ->
 		    {array, [ process_msg(Msgs) ]}
     end.
 
-process_msg({struct, Pairs}) ->
-	 process_cmd(get_bayeux_val("channel", Pairs), Pairs).
+process_msg(Struct) ->
+	 process_cmd(get_bayeux_val("channel", Struct), Struct).
 
-get_bayeux_val(Key, Pairs) ->
-	?D(Pairs),
+get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
 	case [ V || {K, V} <- Pairs, K =:= Key] of
 		[] ->
 			undefined;
 		[ V | _Rest ] ->
     		V
-    end.
+    end;
+get_bayeux_val(_, _) ->
+	undefined.
 
-process_cmd("/meta/handshake", _Pairs) ->	
+process_cmd("/meta/handshake", _Struct) ->	
 	% Advice = {struct, [{reconnect, "retry"},
     %                   {interval, 5000}]},
     Resp = [{channel, "/meta/handshake"}, 
-            {version, 0.9},
-            {supportedConnectionTypes, {array, ["long-polling"]}},
+            {version, 1.0},
+            {supportedConnectionTypes, {array, ["long-polling",
+												"callback-polling"]}},
             {clientId, generate_id()},
             {successful, true}],
     % L2 = [{advice, Advice} | L],
     {struct, Resp};
 
-process_cmd("/meta/connect", Pairs) ->	
-    ClientId = get_bayeux_val("clientId", Pairs),
-	erlycomet_dist_server:add_connection(ClientId, undefined),
+process_cmd("/meta/connect", Struct) ->	
+    ClientId = get_bayeux_val("clientId", Struct),
+    ConnectionType = get_bayeux_val("connectionType", Struct),
+	?D(ConnectionType),
+	erlycomet_dist_server:add_connection(ClientId, self()),
     Resp = [{channel, "/meta/connect"}, 
             {successful, true},
             {clientId, ClientId}],
-    {struct, Resp};
+    % put this on a buffer: {struct, Resp}};
+	chunked;
 
-
-process_cmd("/meta/reconnect", Pairs) ->	
-    ClientId = get_bayeux_val("clientId", Pairs),
+% TODO complete rewrite, this is place holder
+process_cmd("/meta/reconnect", Struct) ->	
+    ClientId = get_bayeux_val("clientId", Struct),
     case erlycomet_dist_server:connection(ClientId) of
 	    {error, _} ->
 	        Resp = [{channel, "/meta/reconnect"}, 
@@ -115,26 +126,13 @@ process_cmd("/meta/reconnect", Pairs) ->
 	        Resp = [{channel, "/meta/reconnect"}, 
 	                {successful, true}],             
 	        Pid = self(),
-	        spawn(fun() -> erlycomet_dist_server:replace_connection(ClientId, self()),
-	                       loop(Pid, ClientId) 
-	              end),
+	        %%spawn(fun() -> erlycomet_dist_server:replace_connection(ClientId, self()),
+	        %%               loop(Pid, ClientId) 
+	        %%      end),
 	        %%[{header, {cache_control, "no-cache"}},
 	        %% {streamcontent_with_timeout, "content_type(Props)", Response, infinity}] %% needs to be adapted
 			{struct, Resp} %% needs to be adapted
 	end.
-
-
-loop(_Pid, ClientId) ->
-    receive
-        stop ->  
-            %yaws_api:stream_chunk_end(Pid),
-            erlycomet_dist_server:remove_connection(ClientId);
-        Response -> 
-            ?D({"Response: ", Response}),
-            %yaws_api:stream_chunk_deliver_blocking(Pid, maybe_jsonp(Response, JsonP)),
-            %yaws_api:stream_chunk_end(Pid),
-            erlycomet_dist_server:remove_connection(ClientId)
-    end.
 	
 	
 generate_id() ->

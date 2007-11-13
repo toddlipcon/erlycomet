@@ -199,6 +199,7 @@ dojox.cometd = new function(){
 			switch(message.channel){
 				case "/meta/connect":
 					if(message.successful && !this._connected){
+						console.debug("connect - success");
 						this._connected = this._initialized;
 						this.endBatch();
 					} else if(!this._initialized){
@@ -502,6 +503,7 @@ dojox.cometd.longPollTransport = new function(){
 					this._connect();
 				}
 			}else{
+				console.debug("tunnelCollapse");
 				this._connect();
 			}
 		}

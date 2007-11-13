@@ -94,7 +94,7 @@ is_global() ->
 % rsaccon: TODO: implement all the functiones below wwith dist. mnesia RAM tables instead of ets
 %
 add_connection(ClientId, Pid) ->
-	?D("add_connection"),
+	?D({"add_connection: " , Pid}),
     gen_server:call({global,?MODULE}, {add_connection, ClientId, Pid}). 
 
 connections() ->
@@ -103,6 +103,9 @@ connections() ->
 connection(ClientId) ->
     gen_server:call({global,?MODULE}, {connection, ClientId}). 
 
+remove_connection(Pid) when is_pid(Pid)->
+    ?D(not_implemented_yet);
+	
 remove_connection(ClientId) ->
     gen_server:call({global,?MODULE}, {remove_connection, ClientId}).
 
@@ -152,7 +155,6 @@ init([]) ->
 
 
 handle_call({add_connection, ClientId, Pid}, _From, State) ->
-	?D("go here"),
     ets:insert(State#state.connections, {ClientId, Pid}),
     Reply = ok,
     {reply, Reply, State};
