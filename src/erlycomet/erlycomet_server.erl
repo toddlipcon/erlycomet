@@ -29,7 +29,7 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet_cluster).
+-module(erlycomet_server).
 -author('rsaccon@gmail.com').
 -include("../../include/erlycomet.hrl").
 
@@ -40,7 +40,6 @@
 -export([start/0, 
          stop/0,
 		 is_global/0,
-		 next_id/0,
          add_connection/2,
          get_connections/0,
          get_connection_pid/1,
@@ -60,9 +59,8 @@
          terminate/2, 
          code_change/3]).
 
-% rsaccon: TODO: mnesia RAM tables instead of ets
--record(state, {next_id = 0,
-                connections = ets:new(connections_table, []),
+% rsaccon: TODO: disrubuted mnesia RAM tables instead of ets
+-record(state, {connections = ets:new(connections_table, []),
                 channels = ets:new(channels_table, [])}).
 
 %%====================================================================
@@ -92,19 +90,11 @@ is_global() ->
 	        false
     end.
 
-%%-------------------------------------------------------------------------
-%% @spec () -> integer()
-%% @doc creates an incremental, global unique, non-persistant id
-%% @end
-%%-------------------------------------------------------------------------
-next_id() ->
-	gen_server:call({global,?MODULE}, {next_id}).		
 
-
-
-% rsaccon: TODO: what is global what is local ????? Do we need that at all with mnesia RAM tables ???
+% rsaccon: TODO: implemnt all this wwith mnesia RAM tables ???
 
 add_connection(ClientId, Pid) ->
+	?D("add_connection"),
     gen_server:call({global,?MODULE}, {add_connection, ClientId, Pid}). 
 
 get_connections() ->
@@ -160,9 +150,6 @@ init([]) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 
-handle_call({next_id}, _From, #state{next_id=Id}=State) ->
-	NextId = Id+1,
-    {reply, Id, State#state{next_id=NextId}};
 
 handle_call({add_connection, ClientId, Pid}, _From, State) ->
     ets:insert(State#state.connections, {ClientId, Pid}),

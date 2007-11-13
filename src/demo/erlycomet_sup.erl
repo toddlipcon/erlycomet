@@ -35,26 +35,24 @@
 
 -behaviour(supervisor).
 
-%% --------------------------------------------------------------------
-%% External exports
-%% --------------------------------------------------------------------
+%% API
 -export([start_link/1]).
 
-%% --------------------------------------------------------------------
-%% gen_server callbacks
-%% --------------------------------------------------------------------
+%% Supervisor callbacks
 -export([init/1, upgrade/0]).
 
-%% --------------------------------------------------------------------
 %% Definitions
-%% --------------------------------------------------------------------
 -define(SERVER, ?MODULE).
 
 
-%% ====================================================================
-%% External functions
-%% ====================================================================
-
+%%====================================================================
+%% API functions
+%%====================================================================
+%%--------------------------------------------------------------------
+%% @spec start_link() -> {ok,Pid} | ignore | {error,Error}
+%% @doc Starts the supervisor
+%% @end 
+%%--------------------------------------------------------------------
 start_link(Args) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, Args).
 
@@ -67,26 +65,39 @@ upgrade() ->
     ok.
 	
 	
-%% ====================================================================
-%% Supervisor functions
-%% ====================================================================
-
+%%====================================================================
+%% Supervisor callbacks
+%%====================================================================
+%%--------------------------------------------------------------------
+%% @spec init(Args) -> {ok,  {SupFlags,  [ChildSpec]}} |
+%%                     ignore                          |
+%%                     {error, Reason}
+%% @doc Whenever a supervisor is started using 
+%% supervisor:start_link/[2,3], this function is called by the new process 
+%% to find out about restart strategy, maximum restart frequency and child 
+%% specifications.
+%% @end 
+%%--------------------------------------------------------------------
 init([]) ->	
     RestartStrategy = one_for_one,
     MaxRestarts = 10,
     MaxTimeBetweenRestarts = 10,
     SupFlags  = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
-    ErlyComet = {erlycomet_cluster,
-                 {erlycomet_cluster, start, []},
+    ErlyComet = {erlycomet_server,
+                 {erlycomet_server, start, []},
                  permanent,
                  1000,
                  worker,
-                 [erlycomet_cluster]},
-    MochiWeb = {erlycomet_http, 
-				{erlycomet_http, start, []},
-                permanent,
-                1000,
-                worker,
-                [erlycomet_http]},
-    {ok,{SupFlags, [ErlyComet, MochiWeb]}}.
-	
+                 [erlycomet_sever]},
+    Demo = {erlycomet_demo, 
+		    {erlycomet_demo, start, []},
+            permanent,
+            1000,
+            worker,
+            [erlycomet_demo]},
+    {ok,{SupFlags, [ErlyComet, Demo]}}.
+
+
+%%====================================================================
+%% Internal functions
+%%====================================================================

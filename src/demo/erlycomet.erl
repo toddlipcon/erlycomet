@@ -32,18 +32,50 @@
 -module(erlycomet).
 -author('rsaccon@gmail.com').
 
+%% API
+-export ([start/0, stop/0, reload/0]).
 
--compile(export_all).
 
-
+%%====================================================================
+%% API
+%%====================================================================
+%%--------------------------------------------------------------------
+%% @spec () -> any()
+%% @doc start erlycomet demo application
+%% @end 
+%%--------------------------------------------------------------------
 start() -> 
 	io:format("Starting ErlyComet Demo...~n"),
+	ensure_started(crypto),
 	application:start(erlycomet).
 
+
+%%--------------------------------------------------------------------
+%% @spec () -> any()
+%% @doc stop erlycomet demo application
+%% @end 
+%%--------------------------------------------------------------------
 stop() ->
 	io:format("Stopping ErlyComet Demo...~n"),
 	application:stop(erlycomet).
 
+%%--------------------------------------------------------------------
+%% @spec () -> any()
+%% @doc reload erlycomet modules
+%% @end 
+%%--------------------------------------------------------------------
 reload() ->
 	io:format("Compiling and reloading ErlyComet Modules ...~n"),
 	make:all([load]).
+	
+
+%%====================================================================
+%% Internal functions
+%%====================================================================	
+ensure_started(App) ->
+    case application:start(App) of
+		ok ->
+	    	ok;
+		{error, {already_started, App}} ->
+	    	ok
+    end.

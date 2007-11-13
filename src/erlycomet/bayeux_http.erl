@@ -32,6 +32,7 @@ process_handshake(_Msg) ->
 	     {"supportedConnectionTypes",
 	      {array,["long-polling","callback-polling"]}}]}.
 
+
 % Note: need to call crypto:start() for this to work.  Add to app?
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
