@@ -45,8 +45,7 @@
 %%====================================================================
 %%--------------------------------------------------------------------
 %% @spec
-%% @doc 
-%% handle POST message
+%% @doc handle POST message
 %% @end 
 %%--------------------------------------------------------------------
 handle([{"message", Msg}]) ->
@@ -96,7 +95,7 @@ process_cmd("/meta/handshake", _Pairs) ->
 
 process_cmd("/meta/connect", Pairs) ->	
     ClientId = get_bayeux_val("clientId", Pairs),
-	erlycomet_commands:add_connection(ClientId, undefined),
+	erlycomet_dist_server:add_connection(ClientId, undefined),
     Resp = [{channel, "/meta/connect"}, 
             {successful, true},
             {clientId, ClientId}],
@@ -105,7 +104,7 @@ process_cmd("/meta/connect", Pairs) ->
 
 process_cmd("/meta/reconnect", Pairs) ->	
     ClientId = get_bayeux_val("clientId", Pairs),
-    case erlycomet_cluster:get_connection(ClientId) of
+    case erlycomet_dist_server:connection(ClientId) of
 	    {error, _} ->
 	        Resp = [{channel, "/meta/reconnect"}, 
 	                {successful, false},
@@ -116,7 +115,7 @@ process_cmd("/meta/reconnect", Pairs) ->
 	        Resp = [{channel, "/meta/reconnect"}, 
 	                {successful, true}],             
 	        Pid = self(),
-	        spawn(fun() -> erlycomet_cluster:replace_connection(ClientId, self()),
+	        spawn(fun() -> erlycomet_dist_server:replace_connection(ClientId, self()),
 	                       loop(Pid, ClientId) 
 	              end),
 	        %%[{header, {cache_control, "no-cache"}},
@@ -129,17 +128,17 @@ loop(_Pid, ClientId) ->
     receive
         stop ->  
             %yaws_api:stream_chunk_end(Pid),
-            erlycomet_cluster:remove_connection(ClientId);
+            erlycomet_dist_server:remove_connection(ClientId);
         Response -> 
             ?D({"Response: ", Response}),
             %yaws_api:stream_chunk_deliver_blocking(Pid, maybe_jsonp(Response, JsonP)),
             %yaws_api:stream_chunk_end(Pid),
-            erlycomet_cluster:remove_connection(ClientId)
+            erlycomet_dist_server:remove_connection(ClientId)
     end.
 	
 	
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
-	% rsaccon TODO: check whether it is not taken already, if yes, regenerate
+	% TODO: check whether it is not taken already, if yes, return generate_id().
     HexStr.
