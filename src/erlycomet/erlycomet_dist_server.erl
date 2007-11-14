@@ -94,7 +94,6 @@ is_global() ->
 % rsaccon: TODO: implement all the functiones below wwith dist. mnesia RAM tables instead of ets
 %
 add_connection(ClientId, Pid) ->
-	?D({"add_connection: " , Pid}),
     gen_server:call({global,?MODULE}, {add_connection, ClientId, Pid}). 
 
 connections() ->
@@ -166,7 +165,7 @@ handle_call({connections}, _From, State) ->
 handle_call({connection, ClientId}, _From, State) ->
     Reply = case ets:lookup(State#state.connections, ClientId) of
                 [] ->
-                    {error, connection_not_found};
+                    undefined;
                 [Pid] ->
                     Pid
             end,

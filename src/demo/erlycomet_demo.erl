@@ -79,31 +79,20 @@ loop(Req) ->
 loop(Req, 'GET', [$/ | Path], DocRoot) ->
     Req:serve_file(Path, DocRoot);
 
-loop(Req, 'POST', "/cometd", _) ->
-	case erlycomet_bayeux:handle(Req:parse_post()) of
-		{done, Resp} ->
-			Req:respond(Resp);
-		{continue, Resp} ->
-			Req:respond(Resp),
-			loop2(Req);
-		_ ->
-    		Req:not_found()
-	end;
+loop(Req, Method, "/cometd", _) ->
+	erlycomet_bayeux:handle(Req, Method);
+	
+%loop(Req, 'POST', "/cometd", _) ->
+%	case erlycomet_bayeux:handle(Req:parse_post()) of
+%		{done, Resp} ->
+%			Req:respond(Resp);
+%		{continue, Resp} ->
+%			Req:respond(Resp),
+%			loop2(Req);
+%		_ ->
+%   		Req:not_found()
+%	end;
 	
 loop(Req, Method, Path, _) ->
 	?D({"ignoring_request: ", Method, Path}),
 	Req:not_found().
-	
-	
-
-loop2(Req) ->
-    receive
-        stop ->  
-            ?D("stop"),
-            erlycomet_dist_server:remove_connection(self());
-        Response -> 
-			?D("continue"),
-            Req:respond(Response),
-            erlycomet_dist_server:remove_connection(self()),
-			loop2(Req)
-    end.

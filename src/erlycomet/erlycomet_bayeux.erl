@@ -37,7 +37,9 @@
 -include("../../include/erlycomet.hrl").
 
 %% API
--export([handle/1]).
+-export([handle/2]).
+
+-record(state, {msgs = []}).
 
 
 %%====================================================================
@@ -48,36 +50,37 @@
 %% @doc handle POST message
 %% @end 
 %%--------------------------------------------------------------------
-handle([{"message", Msg}]) ->
-	case process_bayeux_msg(mochijson:decode(Msg)) of
-		{array,[chunked]} ->  % rsaccon: TODO better solution for initaliting chunked stuff
-			{continue, {200, [], chunked}};
+handle(Req, 'POST') ->
+	handle(Req, Req:parse_post());
+
+handle(Req, [{"message", Msg}]) ->
+	case process_bayeux_msg(Req, mochijson:decode(Msg)) of
+		done ->
+			ok;
 		Body ->
-			HResp = mochiweb_headers:make([]),
-		    HResp1 = mochiweb_headers:enter("Content-Type", "text/json" ,HResp),
-			{done, {200, HResp1, mochijson:encode(Body)}}  % Req:ok({"text/json", mochijson:encode(Body)});  
+			Req:ok({"text/json", mochijson:encode(Body)})   
 	end;
 	
-handle(Other) ->
+handle(Req, Other) ->
 	?D({"not_handled: ", Other}),
-	error.
-	
+	Req:not_found().
+
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
 %% input: json object. output: json object result of message processing.
-process_bayeux_msg({Type, Msgs}) ->
+process_bayeux_msg(Req, {Type, Msgs}) ->
     case Type of
 	    array  -> 
-		    {array, [ process_msg(M) || M <- Msgs ]};
+		    {array, [ process_msg(Req, M) || M <- Msgs ]};
 	    struct -> 
-		    {array, [ process_msg(Msgs) ]}
+		    {array, [ process_msg(Req, Msgs) ]}
     end.
 
-process_msg(Struct) ->
-	 process_cmd(get_bayeux_val("channel", Struct), Struct).
+process_msg(Req, Struct) ->
+	 process_cmd(Req, get_bayeux_val("channel", Struct), Struct).
 
 get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
 	case [ V || {K, V} <- Pairs, K =:= Key] of
@@ -89,7 +92,7 @@ get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
 get_bayeux_val(_, _) ->
 	undefined.
 
-process_cmd("/meta/handshake", _Struct) ->	
+process_cmd(_Req, "/meta/handshake", _Struct) ->	
 	% Advice = {struct, [{reconnect, "retry"},
     %                   {interval, 5000}]},
     Resp = [{channel, "/meta/handshake"}, 
@@ -101,19 +104,20 @@ process_cmd("/meta/handshake", _Struct) ->
     % L2 = [{advice, Advice} | L],
     {struct, Resp};
 
-process_cmd("/meta/connect", Struct) ->	
+process_cmd(Req, "/meta/connect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     ConnectionType = get_bayeux_val("connectionType", Struct),
 	?D(ConnectionType),
 	erlycomet_dist_server:add_connection(ClientId, self()),
-    Resp = [{channel, "/meta/connect"}, 
-            {successful, true},
-            {clientId, ClientId}],
-    % put this on a buffer: {struct, Resp}};
-	chunked;
+    Resp = {struct, [{channel, "/meta/connect"}, 
+                     {successful, true},
+                     {clientId, ClientId}]},
+	Req:respond({200, [], chunked}),
+	loop(Req, #state{msgs = [Resp]}),
+	done;
 
 % TODO complete rewrite, this is place holder
-process_cmd("/meta/reconnect", Struct) ->	
+process_cmd(_Req, "/meta/reconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     case erlycomet_dist_server:connection(ClientId) of
 	    {error, _} ->
@@ -125,7 +129,7 @@ process_cmd("/meta/reconnect", Struct) ->
 	        %% get events and add to response
 	        Resp = [{channel, "/meta/reconnect"}, 
 	                {successful, true}],             
-	        Pid = self(),
+	        _Pid = self(),
 	        %%spawn(fun() -> erlycomet_dist_server:replace_connection(ClientId, self()),
 	        %%               loop(Pid, ClientId) 
 	        %%      end),
@@ -138,5 +142,20 @@ process_cmd("/meta/reconnect", Struct) ->
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
-	% TODO: check whether it is not taken already, if yes, return generate_id().
-    HexStr.
+	case erlycomet_dist_server:connection(HexStr) of
+		undefined ->
+    		HexStr;
+		_ ->
+			generate_id()
+	end.
+
+
+loop(Req, State) ->
+    receive
+        stop ->  
+            erlycomet_dist_server:remove_connection(self());
+        {flush, Response} -> 
+			Msgs = lists:reverse([Response | State#state.msgs]),
+            Req:respond(mochijson:encode({array, Msgs})),
+			loop(Req, State#state{msgs=[]})
+    end.
