@@ -41,7 +41,7 @@
 
 -record(state, {id = undefined,
 				msgs = [],
-				timeout = 5000}).  % is low just for testing
+				timeout = 20000}).  % is low just for testing
 
 
 %%====================================================================
