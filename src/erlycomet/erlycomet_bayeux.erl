@@ -101,13 +101,12 @@ process_cmd(_Req, "/meta/handshake", _Struct) ->
 												"callback-polling"]}},
             {clientId, generate_id()},
             {successful, true}],
-    % L2 = [{advice, Advice} | L],
+    % Resp2 = [{advice, Advice} | Resp],
     {struct, Resp};
 
 process_cmd(Req, "/meta/connect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    ConnectionType = get_bayeux_val("connectionType", Struct),
-	?D(ConnectionType),
+    % ConnectionType = get_bayeux_val("connectionType", Struct),
 	erlycomet_dist_server:add_connection(ClientId, self()),
     Resp = {struct, [{channel, "/meta/connect"}, 
                      {successful, true},
@@ -120,7 +119,7 @@ process_cmd(Req, "/meta/connect", Struct) ->
 process_cmd(_Req, "/meta/reconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     case erlycomet_dist_server:connection(ClientId) of
-	    {error, _} ->
+	    undefined ->
 	        Resp = [{channel, "/meta/reconnect"}, 
 	                {successful, false},
 	                {error, "invalid clientId"}], 
