@@ -10,8 +10,8 @@ var room = {
             alert('Please enter a username!');
         }else{
 		
-            dojox.cometd.init(new String(document.location).replace(/http:\/\/[^\/]*/,'').replace(/\/examples\/.*$/,'')+"/cometd");
-            // dojox.cometd.init("http://127.0.0.1:8080/cometd");
+            //dojox.cometd.init(new String(document.location).replace(/http:\/\/[^\/]*/,'').replace(/\/examples\/.*$/,'')+"/cometd");
+            dojox.cometd.init("http://localhost:3000/cometd");
 		
             this._username=name;
             dojo.byId('join').className='hidden';
