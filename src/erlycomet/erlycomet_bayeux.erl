@@ -60,6 +60,7 @@ handle(Req, [{"message", Msg}]) ->
 		done ->
 			ok;
 		Body ->
+			?D({"body: ", Body}),
 			Req:ok({"text/json", mochijson:encode(Body)})   
 	end;
 	
@@ -115,8 +116,7 @@ process_cmd(Req, "/meta/connect", Struct) ->
                      {successful, true},
                      {clientId, ClientId}]},
 	Req:respond({200, [], chunked}),
-	loop(Req, #state{id = ClientId, msgs = [Resp]}),
-	done;
+	loop(Req, #state{id = ClientId, msgs = [Resp]});
 	
 process_cmd(_Req, "/meta/disconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
@@ -173,16 +173,22 @@ generate_id() ->
 loop(Req, State) ->
     receive
         stop ->  
-            erlycomet_dist_server:remove_connection(State#state.id);
+            disconnect(State);
         {flush, Response} -> 
 			Msgs = lists:reverse([Response | State#state.msgs]),
             Req:respond(mochijson:encode({array, Msgs})),
 			loop(Req, State#state{msgs=[]})
 	after State#state.timeout ->
-		erlycomet_dist_server:remove_connection(State#state.id),
-		Resp = [{channel, "/meta/disconnect"}, 
-	            {successful, true},
-	            {clientId, State#state.id}],
-		Msgs = lists:reverse([{struct, Resp} | State#state.msgs]),
-		{array, Msgs}
+		disconnect(State) 
     end.
+
+
+disconnect(State) ->
+	erlycomet_dist_server:remove_connection(State#state.id),
+	Resp = [{channel, "/meta/disconnect"}, 
+            {successful, true},
+            {clientId, State#state.id}],
+	Msgs = lists:reverse([{struct, Resp} | State#state.msgs]),
+	{array, Msgs}. % wrong, client error and array looks strange 
+	% Msgs.          % wrong, server crash
+	% {struct, Resp}.  % wrong, client error
