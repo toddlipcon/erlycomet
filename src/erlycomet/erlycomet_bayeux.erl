@@ -41,7 +41,7 @@
 
 -record(state, {id = undefined,
 				msgs = [],
-				timeout = 10000}).
+				timeout = 5000}).  % is low just for testing
 
 
 %%====================================================================
@@ -79,7 +79,8 @@ process_bayeux_msg(Req, {Type, Msgs}) ->
 	    array  -> 
 		    {array, [ process_msg(Req, M) || M <- Msgs ]};
 	    struct -> 
-		    {array, [ process_msg(Req, Msgs) ]}
+		    %{array, [ process_msg(Req, Msgs) ]}
+			process_msg(Req, Msgs)
     end.
 
 process_msg(Req, Struct) ->
@@ -189,6 +190,7 @@ disconnect(State) ->
             {successful, true},
             {clientId, State#state.id}],
 	Msgs = lists:reverse([{struct, Resp} | State#state.msgs]),
+	?D(Msgs),
 	{array, Msgs}. % wrong, client error and array looks strange 
 	% Msgs.          % wrong, server crash
 	% {struct, Resp}.  % wrong, client error
