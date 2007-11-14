@@ -1,25 +1,6 @@
 %% @author Bob Ippolito <bob@mochimedia.com>
 %% @copyright 2007 Mochi Media, Inc.
-%%
-%% Permission is hereby granted, free of charge, to any person
-%% obtaining a copy of this software and associated documentation
-%% files (the "Software"), to deal in the Software without restriction,
-%% including without limitation the rights to use, copy, modify, merge,
-%% publish, distribute, sublicense, and/or sell copies of the Software,
-%% and to permit persons to whom the Software is furnished to do
-%% so, subject to the following conditions:
-%%
-%% The above copyright notice and this permission notice shall be included
-%% in all copies or substantial portions of the Software.
-%%
-%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-%% EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-%% MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-%% IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-%% CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-%% TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-%% SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-%%
+
 %% @doc MochiWeb HTTP Request abstraction.
 
 -module(mochiweb_request, [Socket, Method, RawPath, Version, Headers]).
@@ -28,7 +9,7 @@
 -define(QUIP, "Any of you quaids got a smint?").
 
 -export([get_header_value/1, get/1, dump/0]).
--export([send/1, recv/1, recv/2, recv_body/0]).
+-export([send/1, recv/1, recv/2, recv_body/0, recv_body/1]).
 -export([start_response/1, start_raw_response/1, respond/1, ok/1]).
 -export([not_found/0]).
 -export([parse_post/0, parse_qs/0]).
@@ -40,6 +21,7 @@
 -define(SAVE_PATH, mochiweb_request_path).
 -define(SAVE_RECV, mochiweb_request_recv).
 -define(SAVE_BODY, mochiweb_request_body).
+-define(SAVE_BODY_LENGTH, mochiweb_request_body_length).
 -define(SAVE_POST, mochiweb_request_post).
 -define(SAVE_COOKIE, mochiweb_request_cookie).
 
@@ -62,7 +44,7 @@
 get_header_value(K) ->
     mochiweb_headers:get_value(K, Headers).
 
-%% @type field() = socket | method | raw_path | version | headers | peer | path.
+%% @type field() = socket | method | raw_path | version | headers | peer | path | body_length
 
 %% @spec get(field()) -> term()
 %% @doc Return the internal representation of the given field.
@@ -78,6 +60,13 @@ get(headers) ->
     Headers;
 get(peer) ->
     case inet:peername(Socket) of
+	{ok, {Addr={10, _, _, _}, _Port}} ->
+	    case get_header_value("x-forwarded-for") of
+		undefined ->
+		    inet_parse:ntoa(Addr);
+		Hosts ->
+		    string:strip(lists:last(string:tokens(Hosts, ",")))
+	    end;
 	{ok, {{127, 0, 0, 1}, _Port}} ->
 	    case get_header_value("x-forwarded-for") of
 		undefined ->
@@ -96,7 +85,9 @@ get(path) ->
 	    Path;
 	Cached ->
 	    Cached
-    end.
+    end;
+get(body_length) ->
+    erlang:get(?SAVE_BODY_LENGTH).
 
 %% @spec dump() -> {mochiweb_request, [{atom(), term()}]}
 %% @doc Dump the internal representation to a "human readable" set of terms
@@ -135,33 +126,51 @@ recv(Length, Timeout) ->
 	    exit(normal)
     end.
 
+%% @spec body_length() -> undefined | chunked | unknown_transfer_encoding | integer()
+%% @doc  Infer body length from transfer-encoding and content-length headers.
+body_length() ->
+    case get_header_value("transfer-encoding") of
+        undefined ->
+            case get_header_value("content-length") of
+                undefined -> 
+                    undefined;
+                Length ->
+                    list_to_integer(Length)
+            end;
+        "chunked" -> 
+            chunked;
+        Unknown ->
+            {unknown_transfer_encoding, Unknown}
+    end.
+                            
+
 %% @spec recv_body() -> binary()
-%% @doc Receive the body of the HTTP request (defined by Content-Length),
-%%      only suitable for bodies that are not larger than the default maximum
-%%      (1 MB).
+%% @doc Receive the body of the HTTP request (defined by Content-Length).
+%%      Will only receive up to the default max-body length of 1MB.
 recv_body() ->
-    Body = case get_header_value("transfer-encoding") of
-	       undefined ->
-		   case get_header_value("content-length") of
-		       undefined ->
-			   undefined;
-		       Length ->
-			   case list_to_integer(Length) of
-                               0 ->
-                                   <<>>;
-			       X when X >= 0, X =< ?MAX_RECV_BODY ->
-				   recv(X);
-			       X ->
-				   exit({body_too_large, X})
-			   end
-		   end;
-	       "chunked" ->
-		   read_chunked_body(?MAX_RECV_BODY, []);
-	       Unknown ->
-		   exit({unknown_transfer_encoding, Unknown})
-	   end,
+    recv_body(?MAX_RECV_BODY).
+
+%% @spec recv_body(integer()) -> binary()
+%% @doc Receive the body of the HTTP request (defined by Content-Length).
+%%      Will receive up to MaxBody bytes. 
+recv_body(MaxBody) ->
+    Body = case body_length() of
+               undefined ->
+                   undefined;
+               {unknown_transfer_encoding, Unknown} -> 
+                   exit({unknown_transfer_encoding, Unknown});
+               chunked -> 
+                   read_chunked_body(MaxBody, []);
+               0 ->
+                   <<>>;
+               Length when is_integer(Length), Length =< MaxBody ->
+                   recv(Length);
+               Length ->
+                   exit({body_too_large, Length})
+           end,
     put(?SAVE_BODY, Body),
     Body.
+
 
 %% @spec start_response({integer(), ioheaders()}) -> response()
 %% @doc Start the HTTP response by sending the Code HTTP response and
@@ -334,14 +343,17 @@ read_chunked_body(Max, Acc) ->
 %% @doc Read the length of the next HTTP chunk.
 read_chunk_length() ->
     inet:setopts(Socket, [{packet, line}]),
-    Header = gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT),
-    inet:setopts(Socket, [{packet, raw}]),
-    {Hex, _Rest} = lists:splitwith(
-		     fun (C) ->
-			     C =/= $\r andalso C =/= $\n andalso C =/= $\;
-			 end,
-		     binary_to_list(Header)),
-    mochihex:to_int(Hex).
+    case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
+        {ok, Header} ->
+            inet:setopts(Socket, [{packet, raw}]),
+            Splitter = fun (C) ->
+                               C =/= $\r andalso C =/= $\n andalso C =/= $
+                       end,
+            {Hex, _Rest} = lists:splitwith(Splitter, binary_to_list(Header)),
+            mochihex:to_int(Hex);
+        _ ->
+            exit(normal)
+    end.
 
 %% @spec read_chunk(integer()) -> Chunk::binary() | [Footer::binary()]
 %% @doc Read in a HTTP chunk of the given length. If Length is 0, then read the
@@ -349,20 +361,25 @@ read_chunk_length() ->
 read_chunk(0) ->
     inet:setopts(Socket, [{packet, line}]),
     F = fun (F1, Acc) ->
-		case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
-		    <<"\r\n">> ->
+                case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
+		    {ok, <<"\r\n">>} ->
 			Acc;
-		    Footer ->
-			F1(F1, [Footer | Acc])
+		    {ok, Footer} ->
+			F1(F1, [Footer | Acc]);
+                    _ ->
+                        exit(normal)
 		end
 	end,
     Footers = F(F, []),
     inet:setopts(Socket, [{packet, raw}]),
     Footers;
 read_chunk(Length) ->
-    <<Chunk:Length/binary, "\r\n">> =
-	gen_tcp:recv(Socket, 2 + Length, ?IDLE_TIMEOUT),
-    Chunk.
+    case gen_tcp:recv(Socket, 2 + Length, ?IDLE_TIMEOUT) of 
+        {ok, <<Chunk:Length/binary, "\r\n">>} ->
+            Chunk;
+        _ ->
+            exit(normal)
+    end.
 
 %% @spec serve_file(Path, DocRoot) -> Response
 %% @doc Serve a file relative to DocRoot.

@@ -59,6 +59,8 @@ handle(Req, [{"message", Msg}]) ->
 	case process_bayeux_msg(Req, mochijson:decode(Msg)) of
 		done ->
 			ok;
+		{array,[done]} ->
+			ok;
 		Body ->
 			?D({"body: ", Body}),
 			Req:ok({"text/json", mochijson:encode(Body)})   
@@ -74,17 +76,19 @@ handle(Req, Other) ->
 %%====================================================================
 
 %% input: json object. output: json object result of message processing.
-process_bayeux_msg(Req, {Type, Msgs}) ->
+process_bayeux_msg(Req, {Type, Content}=Struct) ->
     case Type of
 	    array  -> 
-		    {array, [ process_msg(Req, M) || M <- Msgs ]};
+		    {array, [ process_msg(Req, M) || M <- Content ]};
 	    struct -> 
 		    %{array, [ process_msg(Req, Msgs) ]}
-			process_msg(Req, Msgs)
+			process_msg(Req, Struct)
     end.
+
 
 process_msg(Req, Struct) ->
 	 process_cmd(Req, get_bayeux_val("channel", Struct), Struct).
+
 
 get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
 	case [ V || {K, V} <- Pairs, K =:= Key] of
@@ -95,6 +99,7 @@ get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
     end;
 get_bayeux_val(_, _) ->
 	undefined.
+
 
 process_cmd(_Req, "/meta/handshake", _Struct) ->	
 	% Advice = {struct, [{reconnect, "retry"},
@@ -113,11 +118,11 @@ process_cmd(Req, "/meta/connect", Struct) ->
     % ConnectionType = get_bayeux_val("connectionType", Struct),
 	erlycomet_dist_server:add_connection(ClientId, self()),
 	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
-    Resp = {struct, [{channel, "/meta/connect"}, 
-                     {successful, true},
-                     {clientId, ClientId}]},
-	Req:respond({200, [], chunked}),
-	loop(Req, #state{id = ClientId, msgs = [Resp]});
+    Msg = {struct, [{"channel", "/meta/connect"}, 
+                     {"successful", true},
+                     {"clientId", ClientId}]},
+	Resp = Req:respond({200, [], chunked}),
+	loop(Resp, #state{id = ClientId, msgs = [Msg]});
 	
 process_cmd(_Req, "/meta/disconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
@@ -171,26 +176,24 @@ generate_id() ->
 	end.
 
 
-loop(Req, State) ->
+loop(Resp, State) ->
     receive
         stop ->  
-            disconnect(State);
-        {flush, Response} -> 
-			Msgs = lists:reverse([Response | State#state.msgs]),
-            Req:respond(mochijson:encode({array, Msgs})),
-			loop(Req, State#state{msgs=[]})
+            disconnect(Resp, State);
+        {flush, Msg} -> 
+			Msgs = lists:reverse([Msg | State#state.msgs]),
+            Resp:write_chunk(mochijson:encode({array, Msgs})),
+			loop(Resp, State#state{msgs=[]})
 	after State#state.timeout ->
-		disconnect(State) 
+		disconnect(Resp, State)
     end.
 
 
-disconnect(State) ->
+disconnect(Resp, State) ->
 	erlycomet_dist_server:remove_connection(State#state.id),
-	Resp = [{channel, "/meta/disconnect"}, 
-            {successful, true},
-            {clientId, State#state.id}],
-	Msgs = lists:reverse([{struct, Resp} | State#state.msgs]),
-	?D(Msgs),
-	{array, Msgs}. % wrong, client error and array looks strange 
-	% Msgs.          % wrong, server crash
-	% {struct, Resp}.  % wrong, client error
+	Msg = {struct, [{"channel", "/meta/disconnect"}, 
+                    {"successful", true},
+                    {"clientId", State#state.id}]},
+	Resp:write_chunk(mochijson:encode(Msg)),
+	Resp:write_chunk([]),
+	done.

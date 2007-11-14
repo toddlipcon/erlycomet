@@ -250,6 +250,7 @@ dojox.cometd = new function(){
 	}
 
 	this.disconnect = function(){
+		console.log("disconnect");
 		dojo.forEach(this._subscriptions, dojo.unsubscribe);
 		this._subscriptions = [];
 		this._messageQ = [];
