@@ -39,7 +39,9 @@
 %% API
 -export([handle/2]).
 
--record(state, {msgs = []}).
+-record(state, {id = undefined,
+				msgs = [],
+				timeout = 10000}).
 
 
 %%====================================================================
@@ -108,36 +110,55 @@ process_cmd(Req, "/meta/connect", Struct) ->
     ClientId = get_bayeux_val("clientId", Struct),
     % ConnectionType = get_bayeux_val("connectionType", Struct),
 	erlycomet_dist_server:add_connection(ClientId, self()),
+	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
     Resp = {struct, [{channel, "/meta/connect"}, 
                      {successful, true},
                      {clientId, ClientId}]},
 	Req:respond({200, [], chunked}),
-	loop(Req, #state{msgs = [Resp]}),
+	loop(Req, #state{id = ClientId, msgs = [Resp]}),
 	done;
-
-% TODO complete rewrite, this is place holder
-process_cmd(_Req, "/meta/reconnect", Struct) ->	
+	
+process_cmd(_Req, "/meta/disconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    case erlycomet_dist_server:connection(ClientId) of
-	    undefined ->
-	        Resp = [{channel, "/meta/reconnect"}, 
-	                {successful, false},
-	                {error, "invalid clientId"}], 
-	        {struct, Resp};
-	    _ ->
-	        %% get events and add to response
-	        Resp = [{channel, "/meta/reconnect"}, 
-	                {successful, true}],             
-	        _Pid = self(),
-	        %%spawn(fun() -> erlycomet_dist_server:replace_connection(ClientId, self()),
-	        %%               loop(Pid, ClientId) 
-	        %%      end),
-	        %%[{header, {cache_control, "no-cache"}},
-	        %% {streamcontent_with_timeout, "content_type(Props)", Response, infinity}] %% needs to be adapted
-			{struct, Resp} %% needs to be adapted
-	end.
+    erlycomet_dist_server:remove_connection(ClientId),
+	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
+	Resp = [{channel, "/meta/disconnect"}, 
+            {successful, true},
+            {clientId, ClientId}],
+	{struct, Resp};
+
+process_cmd(_Req, "/meta/subcribe", Struct) ->	
+    ClientId = get_bayeux_val("clientId", Struct),
+	Subscription = get_bayeux_val("subscription", Struct),
+    erlycomet_dist_server:subscribe(ClientId, Subscription),
+	%% rsaccon: TODO; case when erlycomet_dist_server:subscribe/2 fails
+	Resp = [{channel, "/meta/subcribe"}, 
+            {successful, true},
+            {clientId, ClientId},
+            {subscription, Subscription}],
+	{struct, Resp};
 	
-	
+process_cmd(_Req, "/meta/unsubcribe", Struct) ->	
+    ClientId = get_bayeux_val("clientId", Struct),
+	Subscription = get_bayeux_val("subscription", Struct),
+    erlycomet_dist_server:unsubscribe(ClientId, Subscription),
+	%% rsaccon: TODO; case when erlycomet_dist_server:unsubscribe/2 fails
+	Resp = [{channel, "/meta/unsubcribe"}, 
+            {successful, true},
+            {clientId, ClientId},
+            {subscription, Subscription}],
+	{struct, Resp};
+			
+process_cmd(_Req, Channel, Struct) ->	
+    _ClientId = get_bayeux_val("clientId", Struct),
+    Data = get_bayeux_val("data", Struct),
+    erlycomet_dist_server:deliver_to_channel(Channel, Data),
+	%% rsaccon: TODO; case when erlycomet_dist_server:deliver_to_channel/2 fails
+	Resp = [{channel, Channel}, 
+            {successful, true}],
+	{struct, Resp}.
+		
+			
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
@@ -152,9 +173,16 @@ generate_id() ->
 loop(Req, State) ->
     receive
         stop ->  
-            erlycomet_dist_server:remove_connection(self());
+            erlycomet_dist_server:remove_connection(State#state.id);
         {flush, Response} -> 
 			Msgs = lists:reverse([Response | State#state.msgs]),
             Req:respond(mochijson:encode({array, Msgs})),
 			loop(Req, State#state{msgs=[]})
+	after State#state.timeout ->
+		erlycomet_dist_server:remove_connection(State#state.id),
+		Resp = [{channel, "/meta/disconnect"}, 
+	            {successful, true},
+	            {clientId, State#state.id}],
+		Msgs = lists:reverse([{struct, Resp} | State#state.msgs]),
+		{array, Msgs}
     end.

@@ -101,9 +101,6 @@ connections() ->
     
 connection(ClientId) ->
     gen_server:call({global,?MODULE}, {connection, ClientId}). 
-
-remove_connection(Pid) when is_pid(Pid)->
-    ?D(not_implemented_yet);
 	
 remove_connection(ClientId) ->
     gen_server:call({global,?MODULE}, {remove_connection, ClientId}).
