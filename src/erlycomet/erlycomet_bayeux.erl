@@ -2,9 +2,9 @@
 %%% File:      erlycomet_bayeux.erl
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @author    Tait Larson
-%%% @copyright 2007 Roberto Saccon
-%%% @doc  
-%%% Comet Extension for MochiWeb
+%%% @copyright 2007 Roberto Saccon, Tait Larson
+%%% @doc Comet Extension for MochiWeb
+%%% @reference  See <a href="http://erlyvideo.googlecode.com" target="_top">http://erlyvideo.googlecode.com</a> for more information
 %%% @end  
 %%%
 %%% The MIT License
