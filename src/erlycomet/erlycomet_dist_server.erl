@@ -31,6 +31,7 @@
 %%%---------------------------------------------------------------------------------------
 -module(erlycomet_dist_server).
 -author('rsaccon@gmail.com').
+-author('telarson@gmail.com').
 -include("../../include/erlycomet.hrl").
 
 -behaviour(gen_server).
@@ -63,6 +64,9 @@
 -record(state, {connections = ets:new(connections_table, []),
                 channels = ets:new(channels_table, [])}).
 
+-record(connection, {client_id, pid}).
+-record(channel, {channel, client_ids}). %rename subscriptions
+
 %%====================================================================
 %% API
 %%====================================================================
@@ -71,10 +75,16 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start() ->
-    gen_server_cluster:start(?MODULE, ?MODULE, [], []).
+    gen_server_cluster:start(?MODULE, ?MODULE, [], []),
+    { _GlobalNode, LocalNodeList } = gen_server_cluster:get_all_server_nodes(),
+    up_master(LocalNodeList).
+
+%TODO: now at each slave need to invoke up_slave(GlobalNode).
 
 stop() -> 
+    mnesia:stop(), %TODO: NEED To stop mnesia on each node.
     gen_server:stop({global, ?MODULE}).
+
 
 %%-------------------------------------------------------------------------
 %% @spec () -> bool()
@@ -151,78 +161,102 @@ init([]) ->
 
 
 handle_call({add_connection, ClientId, Pid}, _From, State) ->
-    ets:insert(State#state.connections, {ClientId, Pid}),
+    %ets:insert(State#state.connections, {ClientId, Pid}),
+    Row = #connection{client_id=ClientId, pid=Pid},
+    F = fun() ->
+		mnesia:write(Row)
+	end,
+    mnesia:transaction(F),
     Reply = ok,
     {reply, Reply, State};
 
 handle_call({connections}, _From, State) ->
-    Reply = ets:tab2list(State#state.connections),
+    Recs = do(qlc:q([X || X <-mnesia:table(connection)])),
+    Reply = [{Y,Z} || {connection, Y, Z} <- Recs],
     {reply, Reply, State};
 
 handle_call({connection, ClientId}, _From, State) ->
-    Reply = case ets:lookup(State#state.connections, ClientId) of
+    F = fun() ->
+		mnesia:read({connection, ClientId})
+	end,
+    {atomic, Row} = mnesia:transaction(F),
+    Reply = case Row of
                 [] ->
                     undefined;
-                [Pid] ->
+                [{connection, ClientId, Pid}] ->
                     Pid
             end,
     {reply, Reply, State};
 
 handle_call({remove_connection, ClientId}, _From, State) ->
-    ets:delete(State#state.connections, ClientId),
-    Reply = ok,
+    Oid = {connection, ClientId},
+    F = fun() ->
+		mnesia:delete(Oid)
+	end,
+    {atomic, Reply} = mnesia:transaction(F),
     {reply, Reply, State};
 
-handle_call({replace_connection, ClientId, Pid}, _From, State) ->
-    ets:delete(State#state.connections, ClientId),
-    ets:insert(State#state.connections, {ClientId, Pid}),
-    Reply = ok,
-    {reply, Reply, State};
+handle_call({replace_connection, ClientId, Pid}, From, State) ->
+    handle_call({add_connection, ClientId, Pid}, From, State);
 
 handle_call({subscribe, ClientId, Channel}, _From, State) ->
-    Reply = case ets:lookup(State#state.channels, Channel) of
-                [] ->
-                    ets:insert(State#state.channels, {Channel, [ClientId]}),
-                    ok;
-                [ClientIdList] ->
-                    ets:insert(State#state.channels, {Channel, [ClientId | ClientIdList]}),
-                    ok
-            end,
+    F = fun() ->
+		ClientIdList = case mnesia:read({channel, Channel}) of
+				   [] -> 
+				       [ClientId];
+				   [{channel, Channel, []} ] ->
+				       [ClientId];
+				   [{channel, Channel, [Ids]} ] ->
+				       [ClientId | Ids]
+			       end,
+		mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
+	end,
+    {atomic, Reply } = mnesia:transaction(F),
     {reply, Reply, State};
 
-
 handle_call({unsubscribe, ClientId, Channel}, _From, State) ->
-    Reply = case ets:lookup(State#state.channels, Channel) of
-                [] ->
-                    {error, channel_not_found};
-                [ClientIdList] ->
-                    ets:insert(State#state.channels, {Channel, lists:delete(ClientId, ClientIdList)}),
-                    ok
-            end,
+    F = fun() ->
+		case mnesia:read({channel, Channel}) of
+		    [] ->
+			{error, channel_not_found};
+		    [{channel, Channel, Ids}] ->
+			mnesia:write({channel, Channel, lists:delete(ClientId,  Ids)})
+		end
+	end,
+    {atomic, Reply} = mnesia:transaction(F),
     {reply, Reply, State};
 
 handle_call({channels}, _From, State) ->
-    Reply = ets:tab2list(State#state.channels),
+    Recs = do(qlc:q([X || X <-mnesia:table(channel)])),
+    Reply = [{Y,Z} || {channel, Y, Z} <- Recs],
     {reply, Reply, State};
 
 handle_call({deliver_to_connection, ClientId, Message}, _From, State) ->
-    Reply = case ets:lookup(State#state.connections, ClientId) of
-                [] ->
-                    {error, connection_not_found};
-                [Pid] ->
-                    Pid ! Message,
-                    ok
-            end,
+    F = fun() -> 
+		mnesia:read({connection, ClientId})
+	end,
+    Reply = case mnesia:transaction(F) of 
+		{atomic, []} ->
+		    {error, connection_not_found};
+		{atomic, [{connection, ClientId, Pid}] } -> 
+		    Pid ! Message,
+		    ok
+	    end,
     {reply, Reply, State};
 
 handle_call({deliver_to_channel, Channel, Message}, _From, State) ->
-    Reply = case ets:lookup(State#state.channels, Channel) of
-                [] ->
-                    {error, channel_not_found};
-                [ClientIdList] ->
-                    [connection(ClientId) ! Message || ClientId <- ClientIdList],
-                    ok
-            end,
+    F = fun() -> 
+		mnesia:read({channel, Channel})
+	end,
+    Reply = case mnesia:transaction(F) of 
+		{atomic, []} ->
+		    {error, channel_not_found};
+		{atomic, [{channel, Channel, []}] } -> 
+		    ok;
+		{atomic, [{channel, Channel, [Ids]}] } -> 
+		    [connection(ClientId) ! Message || ClientId <- Ids],
+		    ok
+	    end,
     {reply, Reply, State}.
 
 
@@ -264,3 +298,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+% do this before up_slave
+up_master(Slaves) ->
+    mnesia:start(),
+    mnesia:create_table(connection, [{attributes, record_info(fields, connection)}, {ram_copies, node()}]),
+    mnesia:create_table(channel, [{attributes, record_info(fields, channel)}, {ram_copies, node()}]),
+    F = fun(N) ->
+		mnesia:add_table_copy(schema, N, ram_copies)
+	end,
+    lists:foreach(F, Slaves).
+
+% do this last    
+up_slave(Master) ->
+    mnesia:start(),
+    mnesia:change_config(extra_db_nodes, [Master]).
+
+do(QLC) ->
+    F = fun() ->
+		 qlc:e(QLC) end,
+    {atomic, Val} = mnesia:transaction(F),
+    Val.
+
