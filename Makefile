@@ -22,7 +22,7 @@ clean-doc:
 	rm -fv doc/*.css
 
 run:
-	$(ERL) -pa `pwd`/ebin \
+	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
 	-sname $(NODE_NAME)
