@@ -31,7 +31,7 @@
 %%%---------------------------------------------------------------------------------------
 -module(erlycomet_app).
 -author('rsaccon@gmail.com').
--include("../../include/erlycomet.hrl").
+
 -behaviour(application).
 
 -define(SERVER, ?MODULE).

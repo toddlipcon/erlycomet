@@ -31,7 +31,6 @@
 %%%---------------------------------------------------------------------------------------
 -module(erlycomet_sup).
 -author('rsaccon@gmail.com').
--include("../../include/erlycomet.hrl").
 
 -behaviour(supervisor).
 

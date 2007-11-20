@@ -31,7 +31,6 @@
 %%%---------------------------------------------------------------------------------------
 -module(erlycomet_demo).
 -author('rsaccon@gmail.com').
--include("../../include/erlycomet.hrl").
 
 
 %% Api
@@ -82,6 +81,5 @@ loop(Req, 'GET', [$/ | Path], DocRoot) ->
 loop(Req, Method, "/cometd", _) ->
 	erlycomet_bayeux:handle(Req, Method);
 	
-loop(Req, Method, Path, _) ->
-	?D({"ignoring_request: ", Method, Path}),
+loop(Req, _Method, _Path, _) ->
 	Req:not_found().

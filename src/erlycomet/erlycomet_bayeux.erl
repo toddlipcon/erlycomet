@@ -34,7 +34,6 @@
 -module(erlycomet_bayeux).
 -author('telarson@gmail.com').
 -author('rsaccon@gmail.com').
--include("../../include/erlycomet.hrl").
 
 %% API
 -export([handle/2]).
@@ -62,12 +61,12 @@ handle(Req, [{"message", Msg}]) ->
 		{array,[done]} ->
 			ok;
 		Body ->
-			?D({"body: ", Body}),
+			io:format("TRACE ~p:~p body: ~p~n",[?MODULE, ?LINE, Body]),
 			Req:ok({"text/json", mochijson:encode(Body)})   
 	end;
 	
 handle(Req, Other) ->
-	?D({"not_handled: ", Other}),
+	io:format("TRACE ~p:~p not handled: ~p~n",[?MODULE, ?LINE, Other]),
 	Req:not_found().
 
 

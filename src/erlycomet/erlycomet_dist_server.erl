@@ -1,6 +1,7 @@
 %%%---------------------------------------------------------------------------------------
 %%% @author     Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
-%%% @copyright  2007 Roberto Saccon
+%%% @author     Roberto Saccon <telarson@gmail.com>
+%%% @copyright  2007 Roberto Saccon, Tait Larson
 %%% @doc        gloabl server
 %%% @reference  See <a href="http://erlyvideo.googlecode.com" target="_top">http://erlyvideo.googlecode.com</a> for more information
 %%% @end
@@ -8,7 +9,7 @@
 %%%
 %%% The MIT License
 %%%
-%%% Copyright (c) 2007 Roberto Saccon
+%%% Copyright (c) 2007 Roberto Saccon, Tait Larson
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -32,7 +33,6 @@
 -module(erlycomet_dist_server).
 -author('rsaccon@gmail.com').
 -author('telarson@gmail.com').
--include("../../include/erlycomet.hrl").
 
 -behaviour(gen_server).
 
