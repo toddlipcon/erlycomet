@@ -65,7 +65,7 @@
 
 -record(connection, {client_id, pid}).
 
--record(channel, {channel, client_ids}). %rename subscriptions
+-record(channel, {channel, client_ids}). 
 
 %%====================================================================
 %% API
@@ -77,7 +77,6 @@
 start() ->
     Result = gen_server_cluster:start(?MODULE, ?MODULE, [], []),
     Node = node(),
-    %% TODO: wait for other nodes having started ???????
     case catch gen_server_cluster:get_all_server_nodes(?MODULE) of
 	    {Node, LocalNodes} ->
 	        up_master(LocalNodes);
@@ -113,13 +112,10 @@ is_global() ->
 %%-------------------------------------------------------------------------
 add_connection(ClientId, Pid) -> 
     Row = #connection{client_id=ClientId, pid=Pid},
-    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 1111]),
     F = fun() ->
 		mnesia:write(Row)
 	end,
-	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 2222]),
     {atomic, Result} = mnesia:transaction(F),
-    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 3333]),
     Result.
  
   
@@ -331,18 +327,32 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-% do this before up_slave
+table_definitions() ->
+    [{connection,
+      [{ram_copies, [node()]},
+       {attributes, record_info(fields, connection)}]},
+     {channel,
+      [{ram_copies, [node()]},
+       {attributes, record_info(fields, channel)}]}].
+       
+% do this before up_slave 
 up_master(Slaves) ->
     _FirstRun = case mnesia:create_schema([node()]) of
         {error, {_Node, {already_exists, _Node}}} -> 
+            mnesia:start(),
             false;
         ok -> 
+            mnesia:start(),
+            lists:foreach(fun ({Name, Args}) ->
+        	                  case mnesia:create_table(Name, Args) of
+        			              {atomic, ok} -> ok;
+        			              {aborted, {already_exists, _}} -> ok
+        		              end
+        	              end,
+        			      table_definitions()),        
             true
-    end,    
-    mnesia:start(),
-    mnesia:create_table(connection, [{attributes, record_info(fields, connection)}, {ram_copies, node()}]),
-    mnesia:create_table(channel, [{attributes, record_info(fields, channel)}, {ram_copies, node()}]),
-    F = fun(N) ->  %% rsaccon IDEA: this should be reqested by non-global node via rpc or message passing
+    end,    	
+    F = fun(N) ->  %% rsaccon IDEA: this should be reqested by non-global node via message passing
 		mnesia:add_table_copy(schema, N, ram_copies)
 	end,
     lists:foreach(F, Slaves).

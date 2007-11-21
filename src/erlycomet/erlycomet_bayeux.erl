@@ -172,13 +172,12 @@ process_cmd(_Req, Channel, Struct) ->
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
-    %% case erlycomet_dist_server:connection(HexStr) of
-    %%  undefined ->
-    %%          HexStr;
-    %%  _ ->
-    %%      generate_id()
-    %% end.
-	HexStr.
+    case erlycomet_dist_server:connection(HexStr) of
+        undefined ->
+            HexStr;
+     _ ->
+        generate_id()
+    end.
 
 
 loop(Resp, State) ->
