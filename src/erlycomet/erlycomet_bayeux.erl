@@ -63,7 +63,8 @@ handle(Req, [{"message", Msg}]) ->
 		Body ->
 			io:format("TRACE ~p:~p body: ~p~n",[?MODULE, ?LINE, Body]),
 			Req:ok({"text/json", mochijson:encode(Body)})   
-	end;
+	end,
+	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, shit]);
 	
 handle(Req, Other) ->
 	io:format("TRACE ~p:~p not handled: ~p~n",[?MODULE, ?LINE, Other]),
@@ -110,13 +111,17 @@ process_cmd(_Req, "/meta/handshake", _Struct) ->
             {clientId, generate_id()},
             {successful, true}],
     % Resp2 = [{advice, Advice} | Resp],
+    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, eeee]),
     {struct, Resp};
 
 process_cmd(Req, "/meta/connect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     % ConnectionType = get_bayeux_val("connectionType", Struct),
-	erlycomet_dist_server:add_connection(ClientId, self()),
+	R = erlycomet_dist_server:add_connection(ClientId, self()),
+	
 	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
+	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, R]),
+	
     Msg = {struct, [{"channel", "/meta/connect"}, 
                      {"successful", true},
                      {"clientId", ClientId}]},
@@ -167,12 +172,13 @@ process_cmd(_Req, Channel, Struct) ->
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
-	case erlycomet_dist_server:connection(HexStr) of
-		undefined ->
-    		HexStr;
-		_ ->
-			generate_id()
-	end.
+    %% case erlycomet_dist_server:connection(HexStr) of
+    %%  undefined ->
+    %%          HexStr;
+    %%  _ ->
+    %%      generate_id()
+    %% end.
+	HexStr.
 
 
 loop(Resp, State) ->

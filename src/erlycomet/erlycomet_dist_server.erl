@@ -76,12 +76,13 @@
 %%--------------------------------------------------------------------
 start() ->
     Result = gen_server_cluster:start(?MODULE, ?MODULE, [], []),
-    ThisNode = node(),
+    Node = node(),
+    %% TODO: wait for other nodes having started ???????
     case catch gen_server_cluster:get_all_server_nodes(?MODULE) of
-	    {ThisNode, LocalNodeList} ->
-	        up_master(LocalNodeList);
+	    {Node, LocalNodes} ->
+	        up_master(LocalNodes);
         _ ->
-	        up_slave(ThisNode)
+	        up_slave(Node)
     end,
     Result.
 
@@ -112,10 +113,13 @@ is_global() ->
 %%-------------------------------------------------------------------------
 add_connection(ClientId, Pid) -> 
     Row = #connection{client_id=ClientId, pid=Pid},
+    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 1111]),
     F = fun() ->
 		mnesia:write(Row)
 	end,
+	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 2222]),
     {atomic, Result} = mnesia:transaction(F),
+    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, 3333]),
     Result.
  
   
@@ -329,16 +333,23 @@ code_change(_OldVsn, State, _Extra) ->
 
 % do this before up_slave
 up_master(Slaves) ->
+    _FirstRun = case mnesia:create_schema([node()]) of
+        {error, {_Node, {already_exists, _Node}}} -> 
+            false;
+        ok -> 
+            true
+    end,    
     mnesia:start(),
     mnesia:create_table(connection, [{attributes, record_info(fields, connection)}, {ram_copies, node()}]),
     mnesia:create_table(channel, [{attributes, record_info(fields, channel)}, {ram_copies, node()}]),
-    F = fun(N) ->
+    F = fun(N) ->  %% rsaccon IDEA: this should be reqested by non-global node via rpc or message passing
 		mnesia:add_table_copy(schema, N, ram_copies)
 	end,
     lists:foreach(F, Slaves).
 
 % do this last    
 up_slave(Master) ->
+    %% rsaccon IDEA: reqest from gobal node to execute mnesia:add_table_copy/3
     mnesia:start(),
     mnesia:change_config(extra_db_nodes, [Master]).
 

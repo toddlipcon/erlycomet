@@ -1,5 +1,6 @@
 ERL=erl
 APP_NAME=erlycomet
+MNESIA_DATA=mnesia-data
 NODE_NAME=erlycomet
 VSN=0.1
 
@@ -25,4 +26,5 @@ run:
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
+	-mnesia dir "\"${MNESIA_DATA}\"" \
 	-sname $(NODE_NAME)
