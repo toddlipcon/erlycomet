@@ -12,17 +12,32 @@
 	<script type="text/javascript"
 		djConfig="isDebug: true"
 		src="http://o.aolcdn.com/dojo/1.0.0/dojo/dojo.xd.js"></script>
-
 	<script type="text/javascript">
-		
+        dojo.require("dojox.cometd");
+
+		Commands = {
+			sayHello: function(){
+				var status = "Button Clicked at time: " + (new Date());
+				dojo.byId("output").innerHTML = status;
+				console.debug(status);
+			}
+		}
+
+		//Put "onload" logic in here.
 		dojo.addOnLoad(function(){
 			dojox.cometd.init("http://localhost:3000/cometd");
+			dojo.connect(dojo.byId("testButton"), "onclick", Commands, "sayHello");
 		});
 	</script>
 		
 </head>
 <body>
-	<h1>ErlyComet</h1>
+	<h1>ErlyComet Demo</h1>
+	<p>
+		<button id="testButton">Click Me</button>
+	</p>
+	<p id="output">
+	</p>	
 </body>
 
 
