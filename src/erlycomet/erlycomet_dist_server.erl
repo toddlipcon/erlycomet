@@ -47,11 +47,10 @@
          connections/0,
          connection/1,
          remove_connection/1,
-         replace_connection/2,
          subscribe/2,
          unsubscribe/2,
          channels/0,
-         deliver_to_connection/2,
+         deliver_to_connection/3,
          deliver_to_channel/2]).
 
 %% gen_server callbacks
@@ -112,7 +111,8 @@ is_global() ->
 
 %%-------------------------------------------------------------------------
 %% @spec 
-%% @doc 
+%% @doc
+%% adds a connection
 %% @end
 %%-------------------------------------------------------------------------
 add_connection(ClientId, Pid) -> 
@@ -120,8 +120,10 @@ add_connection(ClientId, Pid) ->
     F = fun() ->
 		mnesia:write(Row)
 	end,
-    {atomic, Result} = mnesia:transaction(F),
-    Result.
+    case mnesia:transaction(F) of
+        {atomic, ok} -> ok;
+        _ -> error
+    end.
  
   
 %%--------------------------------------------------------------------
@@ -162,17 +164,10 @@ remove_connection(ClientId) ->
     F = fun() ->
 		mnesia:delete(Oid)
 	end,
-    {atomic, Result} = mnesia:transaction(F),
-    Result.
-
-
-%%--------------------------------------------------------------------
-%% @spec  
-%% @doc
-%% @end 
-%%--------------------------------------------------------------------
-replace_connection(ClientId, Pid) ->   %% rsaccon: does that make sense ????
-    add_connection(ClientId, Pid).
+    case mnesia:transaction(F) of
+        {atomic, ok} -> ok;
+        _ -> error
+    end.	
 
 
 %%--------------------------------------------------------------------
@@ -192,8 +187,10 @@ subscribe(ClientId, Channel) ->
         end,
         mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
     end,
-    {atomic, Result} = mnesia:transaction(F),
-    Result.
+    case mnesia:transaction(F) of
+        {atomic, ok} -> ok;
+        _ -> error
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -210,8 +207,10 @@ unsubscribe(ClientId, Channel) ->
 			mnesia:write({channel, Channel, lists:delete(ClientId,  Ids)})
 		end
 	end,
-    {atomic, Result} = mnesia:transaction(F),
-    Result.
+    case mnesia:transaction(F) of
+        {atomic, ok} -> ok;
+        _ -> error
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -230,7 +229,9 @@ channels() ->
 %% @doc
 %% @end 
 %%--------------------------------------------------------------------
-deliver_to_connection(ClientId, Message) ->
+deliver_to_connection(ClientId, Channel, Data) ->
+    Event = {struct, [{"channel", Channel}, 
+                      {"data", Data}]},
     F = fun() -> 
 		mnesia:read({connection, ClientId})
 	end,
@@ -238,7 +239,7 @@ deliver_to_connection(ClientId, Message) ->
 		{atomic, []} ->
 		    {error, connection_not_found};
 		{atomic, [{connection, ClientId, Pid}] } -> 
-		    Pid ! Message,
+		    Pid ! {event, Event},
 		    ok
 	end.
 	
@@ -248,7 +249,9 @@ deliver_to_connection(ClientId, Message) ->
 %% @doc
 %% @end 
 %%--------------------------------------------------------------------
-deliver_to_channel(Channel, Message) ->
+deliver_to_channel(Channel, Data) ->
+    Event = {struct, [{"channel", Channel}, 
+                      {"data", Data}]},                    
     F = fun() -> 
         mnesia:read({channel, Channel})
     end,
@@ -258,7 +261,7 @@ deliver_to_channel(Channel, Message) ->
         {atomic, [{channel, Channel, []}] } -> 
             ok;
         {atomic, [{channel, Channel, [Ids]}] } -> 
-            [connection(ClientId) ! Message || ClientId <- Ids],
+            [connection(ClientId) ! {event, Event} || ClientId <- Ids],
             ok
      end.
 

@@ -40,8 +40,8 @@
 -export([handle/2]).
 
 -record(state, {id = undefined,
-				msgs = [],
-				timeout = 20000}).  % is low just for testing
+				events = [],
+				timeout = 120000}).  % 2 min, just for testing
 
 
 %%====================================================================
@@ -62,7 +62,6 @@ handle(Req, [{"message", Msg}]) ->
 		{array,[done]} ->
 			ok;
 		Body ->
-			io:format("TRACE ~p:~p body: ~p~n",[?MODULE, ?LINE, Body]),
 			Req:ok({"text/json", mochijson:encode(Body)})   
 	end,
 	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, shit]);
@@ -112,62 +111,71 @@ process_cmd(_Req, "/meta/handshake", _Struct) ->
             {clientId, generate_id()},
             {successful, true}],
     % Resp2 = [{advice, Advice} | Resp],
-    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, eeee]),
     {struct, Resp};
 
 process_cmd(Req, "/meta/connect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
+    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
     % ConnectionType = get_bayeux_val("connectionType", Struct),
-	R = erlycomet_dist_server:add_connection(ClientId, self()),
-	
-	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
-	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, R]),
-	
-    Msg = {struct, [{"channel", "/meta/connect"}, 
-                     {"successful", true},
-                     {"clientId", ClientId}]},
-	Resp = Req:respond({200, [], chunked}),
-	loop(Resp, #state{id = ClientId, msgs = [Msg]});
+	L = [{"channel", "/meta/connect"}, 
+         {"clientId", ClientId}],    
+	case erlycomet_dist_server:add_connection(ClientId, self()) of
+	    ok ->	
+            Msg = {struct, [{"successful", true} | L]},
+	        Resp = Req:respond({200, [], chunked}),
+	        loop(Resp, #state{id = ClientId, events = [Msg]});
+	    _ ->
+        	{struct, [{"successful", false} | L]}
+    end;
 	
 process_cmd(_Req, "/meta/disconnect", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    erlycomet_dist_server:remove_connection(ClientId),
-	%% rsaccon: TODO; case when erlycomet_dist_server:add_connection/2 fails
-	Resp = [{channel, "/meta/disconnect"}, 
-            {successful, true},
-            {clientId, ClientId}],
-	{struct, Resp};
+    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
+	L = [{"channel", "/meta/disconnect"}, 
+         {"clientId", ClientId}],
+    case erlycomet_dist_server:remove_connection(ClientId) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end;    
 
-process_cmd(_Req, "/meta/subcribe", Struct) ->	
+process_cmd(_Req, "/meta/subscribe", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
+    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
-    erlycomet_dist_server:subscribe(ClientId, Subscription),
-	%% rsaccon: TODO; case when erlycomet_dist_server:subscribe/2 fails
-	Resp = [{channel, "/meta/subcribe"}, 
-            {successful, true},
-            {clientId, ClientId},
-            {subscription, Subscription}],
-	{struct, Resp};
+	L = [{"channel", "/meta/subscribe"}, 
+         {"clientId", ClientId},
+         {"subscription", Subscription}],
+    case erlycomet_dist_server:subscribe(ClientId, Subscription) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end;	
 	
 process_cmd(_Req, "/meta/unsubcribe", Struct) ->	
     ClientId = get_bayeux_val("clientId", Struct),
+    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
-    erlycomet_dist_server:unsubscribe(ClientId, Subscription),
-	%% rsaccon: TODO; case when erlycomet_dist_server:unsubscribe/2 fails
-	Resp = [{channel, "/meta/unsubcribe"}, 
-            {successful, true},
-            {clientId, ClientId},
-            {subscription, Subscription}],
-	{struct, Resp};
+	L = [{"channel", "/meta/unsubcribe"}, 
+         {"clientId", ClientId},
+         {"subscription", Subscription}],          
+    case erlycomet_dist_server:unsubscribe(ClientId, Subscription) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end;
 			
 process_cmd(_Req, Channel, Struct) ->	
-    _ClientId = get_bayeux_val("clientId", Struct),
     Data = get_bayeux_val("data", Struct),
-    erlycomet_dist_server:deliver_to_channel(Channel, Data),
-	%% rsaccon: TODO; case when erlycomet_dist_server:deliver_to_channel/2 fails
-	Resp = [{channel, Channel}, 
-            {successful, true}],
-	{struct, Resp}.
+    L = case get_bayeux_val("clientId", Struct) of
+        undefined ->
+            %% rsaccon: TODO; do we actually allow that ?
+            [{"channel", Channel}];
+        ClientId ->
+            [{"channel", Channel}, 
+             {"clientId", ClientId}]
+    end,    
+    case erlycomet_dist_server:deliver_to_channel(Channel, Data) of
+   	    ok -> {struct, [{"successful", true}  | L]};
+   	    _ ->  {struct, [{"successful", false}  | L]}
+   	end.
 		
 			
 generate_id() ->
@@ -185,10 +193,14 @@ loop(Resp, State) ->
     receive
         stop ->  
             disconnect(Resp, State);
-        {flush, Msg} -> 
-			Msgs = lists:reverse([Msg | State#state.msgs]),
-            Resp:write_chunk(mochijson:encode({array, Msgs})),
-			loop(Resp, State#state{msgs=[]})
+        {event, Event} -> 
+    		Events = lists:reverse([Event | State#state.events]),
+            Resp:write_chunk(mochijson:encode({array, Events})),
+    		loop(Resp, State#state{events=[]});           
+        flush -> 
+			Events = lists:reverse([State#state.events]),
+            Resp:write_chunk(mochijson:encode({array, Events})),
+			loop(Resp, State#state{events=[]})
 	after State#state.timeout ->
 		disconnect(Resp, State)
     end.
