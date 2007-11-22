@@ -36,6 +36,8 @@
 
 -behaviour(gen_server).
 
+-include_lib("stdlib/include/qlc.hrl").
+
 
 %% API
 -export([start/0, 
@@ -71,22 +73,25 @@
 %% API
 %%====================================================================
 %%--------------------------------------------------------------------
-%% Function: start() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the server
+%% @spec start_link() -> {ok,Pid} | ignore | {error,Error}
+%% @doc Starts the server
+%% @end 
 %%--------------------------------------------------------------------
 start() ->
-    Result = gen_server_cluster:start(?MODULE, ?MODULE, [], []),
+    Start = gen_server_cluster:start(?MODULE, ?MODULE, [], []),
     Node = node(),
     case catch gen_server_cluster:get_all_server_nodes(?MODULE) of
-	    {Node, LocalNodes} ->
-	        up_master(LocalNodes);
-        _ ->
-	        up_slave(Node)
+	    {Node, _} ->
+	        up_master();
+        {Master, _}->
+            gen_server:call(Master, add_mnesia_slave),
+            mnesia:start(),
+            mnesia:change_config(extra_db_nodes, [Node])
     end,
-    Result.
+    Start.
 
 stop() -> 
-    mnesia:stop(), %TODO: NEED To stop mnesia on each node.
+    mnesia:stop(), %TODO: NEED To stop mnesia on each node. ?????
     gen_server:stop({global, ?MODULE}).
 
 
@@ -166,7 +171,7 @@ remove_connection(ClientId) ->
 %% @doc
 %% @end 
 %%--------------------------------------------------------------------
-replace_connection(ClientId, Pid) ->
+replace_connection(ClientId, Pid) ->   %% rsaccon: does that make sense ????
     add_connection(ClientId, Pid).
 
 
@@ -263,25 +268,31 @@ deliver_to_channel(Channel, Message) ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% Function: init(Args) -> {ok, State} |
-%%                         {ok, State, Timeout} |
-%%                         ignore               |
-%%                         {stop, Reason}
-%% Description: Initiates the server
+%% @spec init(Args) -> {ok, State} |
+%%                     {ok, State, Timeout} |
+%%                     ignore               |
+%%                     {stop, Reason}
+%% @doc Initiates the server
+%% @end 
 %%--------------------------------------------------------------------
 init([]) ->
     {ok, #state{}}.
 
 
 %%--------------------------------------------------------------------
-%% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
+%% @spec 
+%% handle_call(Request, From, State) -> {reply, Reply, State} |
 %%                                      {reply, Reply, State, Timeout} |
 %%                                      {noreply, State} |
 %%                                      {noreply, State, Timeout} |
 %%                                      {stop, Reason, Reply, State} |
 %%                                      {stop, Reason, State}
-%% Description: Handling call messages
+%% @doc Handling call messages
+%% @end 
 %%--------------------------------------------------------------------
+handle_call(add_mnesia_slave, From, State) ->
+	mnesia:add_table_copy(schema, From, ram_copies),
+    {reply, ok, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -289,45 +300,53 @@ handle_call(_Request, _From, State) ->
     
 
 %%--------------------------------------------------------------------
-%% Function: handle_cast(Msg, State) -> {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, State}
-%% Description: Handling cast messages
+%% @spec handle_cast(Msg, State) -> {noreply, State} |
+%%                                  {noreply, State, Timeout} |
+%%                                  {stop, Reason, State}
+%% @doc Handling cast messages
+%% @end 
 %%--------------------------------------------------------------------
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+
 %%--------------------------------------------------------------------
-%% Function: handle_info(Info, State) -> {noreply, State} |
+%% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                       {noreply, State, Timeout} |
 %%                                       {stop, Reason, State}
-%% Description: Handling all non call/cast messages
+%% @doc Handling all non call/cast messages
+%% @end 
 %%--------------------------------------------------------------------
 handle_info(_Info, State) ->
     {noreply, State}.
 
+
 %%--------------------------------------------------------------------
-%% Function: terminate(Reason, State) -> void()
-%% Description: This function is called by a gen_server when it is about to
+%% @spec terminate(Reason, State) -> void()
+%% @doc This function is called by a gen_server when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any necessary
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
+%% @end 
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
     ok.
 
+
 %%--------------------------------------------------------------------
-%% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% Description: Convert process state when code is changed
+%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% @doc Convert process state when code is changed
+%% @end 
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
 
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
 
-table_definitions() ->
+mnesia_tables() ->
     [{connection,
       [{ram_copies, [node()]},
        {attributes, record_info(fields, connection)}]},
@@ -335,12 +354,11 @@ table_definitions() ->
       [{ram_copies, [node()]},
        {attributes, record_info(fields, channel)}]}].
        
-% do this before up_slave 
-up_master(Slaves) ->
-    _FirstRun = case mnesia:create_schema([node()]) of
-        {error, {_Node, {already_exists, _Node}}} -> 
-            mnesia:start(),
-            false;
+
+up_master() ->
+    case mnesia:create_schema([node()]) of
+        {error, {_, {already_exists, _}}} -> 
+            mnesia:start();
         ok -> 
             mnesia:start(),
             lists:foreach(fun ({Name, Args}) ->
@@ -349,19 +367,9 @@ up_master(Slaves) ->
         			              {aborted, {already_exists, _}} -> ok
         		              end
         	              end,
-        			      table_definitions()),        
-            true
-    end,    	
-    F = fun(N) ->  %% rsaccon IDEA: this should be reqested by non-global node via message passing
-		mnesia:add_table_copy(schema, N, ram_copies)
-	end,
-    lists:foreach(F, Slaves).
-
-% do this last    
-up_slave(Master) ->
-    %% rsaccon IDEA: reqest from gobal node to execute mnesia:add_table_copy/3
-    mnesia:start(),
-    mnesia:change_config(extra_db_nodes, [Master]).
+        			      mnesia_tables())
+    end.
+    
 
 do(QLC) ->
     F = fun() ->
