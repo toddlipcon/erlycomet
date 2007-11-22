@@ -35,6 +35,8 @@
 
 %% Api
 -export([start/0,
+         status/0,
+         hello/0,
          stop/0,
          stop/1]).
 
@@ -53,13 +55,22 @@ start() ->
 	        {loop, Loop}],
 	Args1 = case application:get_env(App, http_port) of
 	            {ok, Port} ->
+	                io:format("Listening on Port: ~p~n",[Port]),
 			        [{port, Port} | Args];
 			    _ ->
 			        Args
 			end,
 	mochiweb_http:start(Args1).
 			
-
+status() ->
+    L = erlycomet_dist_server:connections(),
+    io:format("Connections: ~p~n",[L]).
+  
+  
+hello() ->
+    io:format("Sending: ~p~n",["hello world"]).
+  
+       
 stop() ->
     mochiweb_http:stop(?MODULE).
 
@@ -75,11 +86,11 @@ loop(Req) ->
 	DocRoot = filename:join([filename:dirname(code:which(?MODULE)),"..", "demo-docroot"]),
     loop(Req, Req:get(method), Req:get(path), DocRoot).
 
-loop(Req, 'GET', [$/ | Path], DocRoot) ->
-    Req:serve_file(Path, DocRoot);
-
 loop(Req, Method, "/cometd", _) ->
 	erlycomet_bayeux:handle(Req, Method);
+    	
+loop(Req, 'GET', [$/ | Path], DocRoot) ->
+    Req:serve_file(Path, DocRoot);
 	
 loop(Req, _Method, _Path, _) ->
 	Req:not_found().

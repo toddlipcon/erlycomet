@@ -41,7 +41,8 @@
 
 -record(state, {id = undefined,
 				events = [],
-				timeout = 120000}).  % 2 min, just for testing
+				timeout = 1200000,      % 20 min, just for testing
+				callback = undefined}).  
 
 
 %%====================================================================
@@ -54,20 +55,32 @@
 %%--------------------------------------------------------------------
 handle(Req, 'POST') ->
 	handle(Req, Req:parse_post());
+	
+handle(Req, 'GET') ->
+	handle(Req, Req:parse_qs());	
 
-handle(Req, [{"message", Msg}]) ->
-	case process_bayeux_msg(Req, mochijson:decode(Msg)) of
+handle(Req, [{"message", Msg}, {"jsonp", Callback} | _]) ->
+	case process_bayeux_msg(Req, mochijson:decode(Msg), Callback) of
+		done ->
+			ok;
+		{array,[done]} ->
+			ok;
+		Body ->
+		    Resp = callback_wrapper(mochijson:encode(Body), Callback),
+			Req:ok({"text/javascript", Resp})   
+	end;
+    	
+handle(Req, [{"message", Msg} | _]) ->
+	case process_bayeux_msg(Req, mochijson:decode(Msg), undefined) of
 		done ->
 			ok;
 		{array,[done]} ->
 			ok;
 		Body ->
 			Req:ok({"text/json", mochijson:encode(Body)})   
-	end,
-	io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, shit]);
-	
-handle(Req, Other) ->
-	io:format("TRACE ~p:~p not handled: ~p~n",[?MODULE, ?LINE, Other]),
+	end;
+    	
+handle(Req, _) ->
 	Req:not_found().
 
 
@@ -76,18 +89,18 @@ handle(Req, Other) ->
 %%====================================================================
 
 %% input: json object. output: json object result of message processing.
-process_bayeux_msg(Req, {Type, Content}=Struct) ->
+process_bayeux_msg(Req, {Type, Content}=Struct, Callback) ->
     case Type of
 	    array  -> 
-		    {array, [ process_msg(Req, M) || M <- Content ]};
+		    {array, [ process_msg(Req, M, Callback) || M <- Content ]};
 	    struct -> 
-		    %{array, [ process_msg(Req, Msgs) ]}
-			process_msg(Req, Struct)
+		    %{array, [ process_msg(Req, Msgs) ]}  ???????????
+			process_msg(Req, Struct, Callback)
     end.
 
 
-process_msg(Req, Struct) ->
-	 process_cmd(Req, get_bayeux_val("channel", Struct), Struct).
+process_msg(Req, Struct, Callback) ->
+	 process_cmd(Req, get_bayeux_val("channel", Struct), Struct, Callback).
 
 
 get_bayeux_val(Key, {struct, Pairs}) when is_list(Pairs) ->
@@ -101,7 +114,7 @@ get_bayeux_val(_, _) ->
 	undefined.
 
 
-process_cmd(_Req, "/meta/handshake", _Struct) ->	
+process_cmd(_Req, "/meta/handshake", _Struct, _) ->	
 	% Advice = {struct, [{reconnect, "retry"},
     %                   {interval, 5000}]},
     Resp = [{channel, "/meta/handshake"}, 
@@ -113,22 +126,24 @@ process_cmd(_Req, "/meta/handshake", _Struct) ->
     % Resp2 = [{advice, Advice} | Resp],
     {struct, Resp};
 
-process_cmd(Req, "/meta/connect", Struct) ->	
+process_cmd(Req, "/meta/connect", Struct, Callback) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     %% rsaccon: TODO; what do we do if there is no valid ClientId ?
-    % ConnectionType = get_bayeux_val("connectionType", Struct),
+    _ConnectionType = get_bayeux_val("connectionType", Struct),
 	L = [{"channel", "/meta/connect"}, 
          {"clientId", ClientId}],    
 	case erlycomet_dist_server:add_connection(ClientId, self()) of
 	    ok ->	
             Msg = {struct, [{"successful", true} | L]},
 	        Resp = Req:respond({200, [], chunked}),
-	        loop(Resp, #state{id = ClientId, events = [Msg]});
+	        loop(Resp, #state{id = ClientId, 
+	                          events = [Msg],
+	                          callback = Callback});
 	    _ ->
         	{struct, [{"successful", false} | L]}
     end;
 	
-process_cmd(_Req, "/meta/disconnect", Struct) ->	
+process_cmd(_Req, "/meta/disconnect", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	L = [{"channel", "/meta/disconnect"}, 
@@ -138,7 +153,7 @@ process_cmd(_Req, "/meta/disconnect", Struct) ->
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;    
 
-process_cmd(_Req, "/meta/subscribe", Struct) ->	
+process_cmd(_Req, "/meta/subscribe", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
@@ -150,7 +165,7 @@ process_cmd(_Req, "/meta/subscribe", Struct) ->
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;	
 	
-process_cmd(_Req, "/meta/unsubcribe", Struct) ->	
+process_cmd(_Req, "/meta/unsubcribe", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
     %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
@@ -162,7 +177,7 @@ process_cmd(_Req, "/meta/unsubcribe", Struct) ->
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;
 			
-process_cmd(_Req, Channel, Struct) ->	
+process_cmd(_Req, Channel, Struct, _) ->	
     Data = get_bayeux_val("data", Struct),
     L = case get_bayeux_val("clientId", Struct) of
         undefined ->
@@ -176,8 +191,14 @@ process_cmd(_Req, Channel, Struct) ->
    	    ok -> {struct, [{"successful", true}  | L]};
    	    _ ->  {struct, [{"successful", false}  | L]}
    	end.
-		
-			
+
+
+callback_wrapper(Data, undefined) ->
+    Data;		
+callback_wrapper(Data, Callback) ->
+    lists:concat([Callback, "(", Data, ");"]).
+    
+    			
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
@@ -189,7 +210,7 @@ generate_id() ->
     end.
 
 
-loop(Resp, State) ->
+loop(Resp, #state{callback = Callback} = State) ->
     receive
         stop ->  
             disconnect(Resp, State);
@@ -199,18 +220,20 @@ loop(Resp, State) ->
     		loop(Resp, State#state{events=[]});           
         flush -> 
 			Events = lists:reverse([State#state.events]),
-            Resp:write_chunk(mochijson:encode({array, Events})),
+			Chunk = callback_wrapper(mochijson:encode({array, Events}), Callback),
+            Resp:write_chunk(Chunk),
 			loop(Resp, State#state{events=[]})
 	after State#state.timeout ->
 		disconnect(Resp, State)
     end.
 
 
-disconnect(Resp, State) ->
+disconnect(Resp, #state{callback = Callback} = State) ->
 	erlycomet_dist_server:remove_connection(State#state.id),
 	Msg = {struct, [{"channel", "/meta/disconnect"}, 
                     {"successful", true},
                     {"clientId", State#state.id}]},
-	Resp:write_chunk(mochijson:encode(Msg)),
+    Chunk = callback_wrapper(mochijson:encode(Msg), Callback),
+    Resp:write_chunk(Chunk),
 	Resp:write_chunk([]),
 	done.
