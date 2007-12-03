@@ -72,12 +72,27 @@ hello() ->
   
        
 stop() ->
-    mochiweb_http:stop(?MODULE).
-
+    mochiweb_http:stop(?MODULE),
+    register(clock, spawn(fun() ->
+				  tick() end)).
 
 stop(Name) ->
+    clock ! stop,
     mochiweb_http:stop(Name).
 
+tick() ->
+    receive
+	stop ->
+	    void
+    after 1000 ->
+	    {_,Secs,_} = now() rem 1000,
+	    Channel = "/test/time",
+	    Data = [struct, 
+		    {data, Secs},
+		    {channel, Channel}],
+	    erlycomet_dist_server:deliver_to_channel(Channel, Data),
+	    tick()
+    end.
 
 %%====================================================================
 %% Internal functions

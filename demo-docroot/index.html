@@ -12,28 +12,30 @@
 	<script type="text/javascript"
 		djConfig="isDebug: true"
 		src="http://o.aolcdn.com/dojo/1.0.0/dojo/dojo.xd.js"></script>
+
 	<script type="text/javascript">
+	function processResponse(msg) {
+	  dojo.byId("output").innerHTML = msg.data.seconds
+	}
         dojo.require("dojox.cometd");
 
 		Commands = {
-			sayHello: function(){
-				var status = "Button Clicked at time: " + (new Date());
-				dojo.byId("output").innerHTML = status;
-				console.debug(status);
-			}
+			showCounter: function(){
+			    dojox.cometd.subscribe("/test/time",processResponse); 
+			}	
 		}
 
 		//Put "onload" logic in here.
 		dojo.addOnLoad(function(){
-			dojox.cometd.init("http://localhost:3000/cometd");
-			dojo.connect(dojo.byId("testButton"), "onclick", Commands, "sayHello");
+		   dojox.cometd.init("http://localhost:3000/cometd");
+		   dojo.connect(dojo.byId("testButton"), "onclick", Commands, "showCounter");
 		});
 	</script>
 		
 </head>
 <body>
 	<h1>ErlyComet Demo</h1>
-	<h1>(this version currently just initiates a Comet connection)</h1>
+	<h1>(provides epoch time mod 1000 counter)</h1>
 	<p>
 		<button id="testButton">Click Me</button>
 	</p>
