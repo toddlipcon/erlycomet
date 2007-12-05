@@ -12,20 +12,26 @@
 	<script type="text/javascript"
 		djConfig="isDebug: true"
 		src="http://o.aolcdn.com/dojo/1.0.0/dojo/dojo.xd.js"></script>
-
-	<script type="text/javascript">
-	function processResponse(msg) {
-	  dojo.byId("output").innerHTML = msg.data.seconds
-	}
+    <!-- 
+	<script type="text/javascript"
+		djConfig="isDebug: true"
+		src="dojo/dojo.js"></script>
+	-->
+			
+	<script type="text/javascript">	
         dojo.require("dojox.cometd");
 
 		Commands = {
 			showCounter: function(){
-			    dojox.cometd.subscribe("/test/time",processResponse); 
+				console.debug("here");
+			    dojox.cometd.subscribe("http://localhost:3000/test/time", this, "processResponse"); 
+			    console.debug("here2");
+			},
+			processResponse: function(msg){
+				dojo.byId("output").innerHTML = msg.data.seconds;
 			}	
 		}
 
-		//Put "onload" logic in here.
 		dojo.addOnLoad(function(){
 		   dojox.cometd.init("http://localhost:3000/cometd");
 		   dojo.connect(dojo.byId("testButton"), "onclick", Commands, "showCounter");
