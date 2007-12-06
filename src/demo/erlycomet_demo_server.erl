@@ -85,7 +85,7 @@ status() ->
 tick() ->
     receive
 	stop ->
-	    void
+	    ok
     after 1000 ->
 	    {_,Secs,_} = now(),
         Channel = "/test/time",

@@ -2,7 +2,7 @@
 %%% @author     Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @author     Roberto Saccon <telarson@gmail.com>
 %%% @copyright  2007 Roberto Saccon, Tait Larson
-%%% @doc        gloabl server
+%%% @doc        gloabl server and mnesia broker
 %%% @reference  See <a href="http://erlyvideo.googlecode.com" target="_top">http://erlyvideo.googlecode.com</a> for more information
 %%% @end
 %%%
@@ -111,7 +111,7 @@ is_global() ->
 
 
 %%-------------------------------------------------------------------------
-%% @spec 
+%% @spec (string(), pid()) -> ok | error 
 %% @doc
 %% adds a connection
 %% @end
@@ -156,8 +156,9 @@ replace_connection(ClientId, Pid) ->
        
           
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec () -> list()
 %% @doc
+%% returns list of connections
 %% @end 
 %%--------------------------------------------------------------------    
 connections() -> 
@@ -166,8 +167,9 @@ connections() ->
  
  
 %%--------------------------------------------------------------------
-%% @spec  
-%% @doc returns the PID of a connection if it exists
+%% @spec (string()) -> pid()
+%% @doc 
+%% returns the PID of a connection if it exists
 %% @end 
 %%--------------------------------------------------------------------    
 connection(ClientId) ->
@@ -188,8 +190,9 @@ connection(ClientId) ->
     
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec (string()) -> ok | error  
 %% @doc
+%% removes a connection
 %% @end 
 %%--------------------------------------------------------------------	
 remove_connection(ClientId) ->
@@ -204,8 +207,9 @@ remove_connection(ClientId) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec (string(), string()) -> ok | error 
 %% @doc
+%% subscribes a client to a channel
 %% @end 
 %%--------------------------------------------------------------------
 subscribe(ClientId, Channel) ->
@@ -227,8 +231,9 @@ subscribe(ClientId, Channel) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec (string(), string()) -> ok | error  
 %% @doc
+%% unsubscribes a client from a channel
 %% @end 
 %%--------------------------------------------------------------------
 unsubscribe(ClientId, Channel) ->
@@ -247,8 +252,9 @@ unsubscribe(ClientId, Channel) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec () -> list()
 %% @doc
+%% returns a list of channels
 %% @end 
 %%--------------------------------------------------------------------
 channels() ->
@@ -258,8 +264,9 @@ channels() ->
 
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec (string(), string(), tuple()) -> ok | {error, connection_not_found} 
 %% @doc
+%% delivers data to one connection
 %% @end 
 %%--------------------------------------------------------------------
 deliver_to_connection(ClientId, Channel, Data) ->
@@ -278,8 +285,9 @@ deliver_to_connection(ClientId, Channel, Data) ->
 	
 
 %%--------------------------------------------------------------------
-%% @spec  
+%% @spec  (string(), tuple()) -> ok | {error, channel_not_found} 
 %% @doc
+%% delivers data to all connections of a channel
 %% @end 
 %%--------------------------------------------------------------------
 deliver_to_channel(Channel, Data) ->
@@ -406,12 +414,12 @@ up_master() ->
         ok -> 
             mnesia:start(),
             lists:foreach(fun ({Name, Args}) ->
-        	                  case mnesia:create_table(Name, Args) of
-        			              {atomic, ok} -> ok;
-        			              {aborted, {already_exists, _}} -> ok
-        		              end
-        	              end,
-        			      mnesia_tables())
+        	    case mnesia:create_table(Name, Args) of
+        			{atomic, ok} -> ok;
+        			{aborted, {already_exists, _}} -> ok
+        		end
+        	end,
+        	mnesia_tables())
     end.
     
 

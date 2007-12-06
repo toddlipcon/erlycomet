@@ -1,9 +1,8 @@
 %%%-------------------------------------------------------------------
-%%% File:      erlycomet.erl
 %%% @author    Roberto Saccon <rsaccon@gmail.com> [http://rsaccon.com]
 %%% @author    Tait Larson
 %%% @copyright 2007 Roberto Saccon, Tait Larson
-%%% @doc Comet Extension for MochiWeb
+%%% @doc Comet extension for MochiWeb
 %%% @reference  See <a href="http://erlyvideo.googlecode.com" target="_top">http://erlyvideo.googlecode.com</a> for more information
 %%% @end  
 %%%
