@@ -1,7 +1,7 @@
 ERL=erl
 APP_NAME=erlycomet_demo
 MNESIA_DATA=mnesia-data
-NODE_NAME=erlycomet
+NODE_NAME=$(APP_NAME)
 VSN=0.1
 
 # The following properties are only required for creating and hosting a dojo xdomain build. 
