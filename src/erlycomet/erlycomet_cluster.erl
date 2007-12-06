@@ -211,7 +211,6 @@ subscribe(ClientId, Channel) ->
             [{channel, Channel, [Ids]} ] ->
                 [ClientId | Ids]
         end,
-        io:format("TRACE ~p:~p ClientIdList: ~p~n",[?MODULE, ?LINE, ClientIdList]),
         mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
     end,
     case mnesia:transaction(F) of

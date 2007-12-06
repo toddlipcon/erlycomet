@@ -72,9 +72,9 @@ stop(Name) ->
 
             			
 status() ->
-    Conns = erlycomet_dist_server:connections(),
+    Conns = erlycomet_clusetr:connections(),
     io:format("Total commected clients: ~p~n~n",[length(Conns)]),
-    Channels = erlycomet_dist_server:channels(),
+    Channels = erlycomet_cluster:channels(),
     [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ],
     ok.
 
@@ -90,7 +90,7 @@ tick() ->
 	    {_,Secs,_} = now(),
         Channel = "/test/time",
         Data = Secs rem 1000,
-        erlycomet_dist_server:deliver_to_channel(Channel, Data),
+        erlycomet_cluster:deliver_to_channel(Channel, Data),
         tick()
     end.
 
@@ -103,7 +103,7 @@ loop(Req) ->
     loop(Req, Req:get(method), Req:get(path), DocRoot).
 
 loop(Req, Method, "/cometd", _) ->
-	erlycomet_bayeux:handle(Req, Method);
+	erlycomet:handle(Req, Method);
     	
 loop(Req, 'GET', [$/ | Path], DocRoot) ->
     Req:serve_file(Path, DocRoot);
