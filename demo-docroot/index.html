@@ -23,9 +23,7 @@
 
 		Commands = {
 			showCounter: function(){
-				console.debug("here");
-			    dojox.cometd.subscribe("http://localhost:3000/test/time", this, "processResponse"); 
-			    console.debug("here2");
+			    dojox.cometd.subscribe("/test/time", this, "processResponse"); 
 			},
 			processResponse: function(msg){
 				dojo.byId("output").innerHTML = msg.data.seconds;

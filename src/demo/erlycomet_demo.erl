@@ -35,14 +35,14 @@
 
 %% Api
 -export([start/0,
-         status/0,
-         hello/0,
          stop/0,
-         stop/1]).
+         stop/1,
+         status/0,
+         start_tick/0]).
 
 
 %% Internal exports
--export([loop/1, loop/4]).
+-export([loop/1, loop/4, tick/0]).
 
 
 %%====================================================================
@@ -61,39 +61,44 @@ start() ->
 			        Args
 			end,
 	mochiweb_http:start(Args1).
-			
-status() ->
-    L = erlycomet_dist_server:connections(),
-    io:format("Connections: ~p~n",[L]).
-  
-  
-hello() ->
-    io:format("Sending: ~p~n",["hello world"]).
-  
-       
+	
+
 stop() ->
-    mochiweb_http:stop(?MODULE),
-    register(clock, spawn(fun() ->
-				  tick() end)).
+    clock ! stop,
+    mochiweb_http:stop(?MODULE).
+
 
 stop(Name) ->
     clock ! stop,
     mochiweb_http:stop(Name).
 
+            			
+status() ->
+    L = erlycomet_dist_server:connections(),
+    io:format("Connections: ~p~n",[L]).
+
+start_tick() ->
+	register(clock, spawn(fun() -> tick() end)).
+
+
+%%====================================================================
+%% Internal exports
+%%====================================================================
 tick() ->
     receive
 	stop ->
 	    void
     after 1000 ->
-	    {_,Secs,_} = now() rem 1000,
-	    Channel = "/test/time",
-	    Data = [struct, 
-		    {data, Secs},
-		    {channel, Channel}],
-	    erlycomet_dist_server:deliver_to_channel(Channel, Data),
-	    tick()
+	    {_,Secs,_} = now(),
+        Channel = "/test/time",
+        Data = [struct, 
+            {data, Secs rem 1000},
+            {channel, Channel}],
+        erlycomet_dist_server:deliver_to_channel(Channel, Data),
+        tick()
     end.
 
+            
 %%====================================================================
 %% Internal functions
 %%====================================================================

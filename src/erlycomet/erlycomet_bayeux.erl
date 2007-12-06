@@ -128,12 +128,13 @@ process_cmd(_Req, "/meta/handshake", _Struct, _) ->
 
 process_cmd(Req, "/meta/connect", Struct, Callback) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
     _ConnectionType = get_bayeux_val("connectionType", Struct),
 	L = [{"channel", "/meta/connect"}, 
          {"clientId", ClientId}],    
-	case erlycomet_dist_server:add_connection(ClientId, self()) of
-	    ok ->	
+    case erlycomet_dist_server:replace_connection(ClientId, self()) of
+        {ok, new} ->
+           {struct, [{"successful", true} | L]};
+	    {ok, replaced} ->	
             Msg = {struct, [{"successful", true} | L]},
 	        Resp = Req:respond({200, [], chunked}),
 	        loop(Resp, #state{id = ClientId, 

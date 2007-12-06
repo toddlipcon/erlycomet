@@ -44,6 +44,7 @@
          stop/0,
 		 is_global/0,
          add_connection/2,
+         replace_connection/2,
          connections/0,
          connection/1,
          remove_connection/1,
@@ -125,7 +126,31 @@ add_connection(ClientId, Pid) ->
         _ -> error
     end.
  
-  
+ 
+%%-------------------------------------------------------------------------
+%% @spec (string(), pid()) -> {ok, new} | {ok, replaced} | error 
+%% @doc
+%% replaces a connection
+%% @end
+%%-------------------------------------------------------------------------
+replace_connection(ClientId, Pid) -> 
+    E = #connection{client_id=ClientId, pid=Pid},
+    F1 = fun() ->
+        mnesia:read({connection, ClientId})
+    end,
+    {atomic, Row} = mnesia:transaction(F1),
+    {Status, F2} = case Row of
+        [] ->
+            {new, fun() -> mnesia:write(E) end};            
+        [_] ->
+            {replaced, fun() -> mnesia:write(E) end}
+    end,
+    case mnesia:transaction(F2) of
+        {atomic, ok} -> {ok, Status};
+        _ -> error
+    end.   
+       
+          
 %%--------------------------------------------------------------------
 %% @spec  
 %% @doc
@@ -138,7 +163,7 @@ connections() ->
  
 %%--------------------------------------------------------------------
 %% @spec  
-%% @doc
+%% @doc returns the PID of a connection if it exists
 %% @end 
 %%--------------------------------------------------------------------    
 connection(ClientId) ->
