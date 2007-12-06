@@ -83,18 +83,18 @@ init([]) ->
     MaxTimeBetweenRestarts = 10,
     SupFlags  = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
     ErlyComet = {erlycomet_dist_server,
-                 {erlycomet_dist_server, start, []},
-                 permanent,
-                 1000,
-                 worker,
-                 [erlycomet_dist_sever]},
-    Demo = {erlycomet_demo, 
-		    {erlycomet_demo, start, []},
-            permanent,
-            1000,
-            worker,
-            [erlycomet_demo]},
-    {ok,{SupFlags, [ErlyComet, Demo]}}.
+        {erlycomet_dist_server, start, []},
+        permanent,
+        1000,
+        worker,
+        [erlycomet_dist_sever]},
+    DemoServer = {erlycomet_demo_server, 
+	    {erlycomet_demo_server, start, []},
+        permanent,
+        1000,
+        worker,
+        [erlycomet_demo_server]},
+    {ok,{SupFlags, [ErlyComet, DemoServer]}}.
 
 
 %%====================================================================

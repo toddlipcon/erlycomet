@@ -29,7 +29,7 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet_demo).
+-module(erlycomet_demo_server).
 -author('rsaccon@gmail.com').
 
 
