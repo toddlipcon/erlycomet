@@ -41,7 +41,7 @@
 -record(state, {id = undefined,
                 connection_type,
 				events = [],
-				timeout = 1200000,      % 20 min, just for testing
+				timeout = 1200000,      %% 20 min, just for testing
 				callback = undefined}).  
 
 
@@ -50,7 +50,7 @@
 %%====================================================================
 %%--------------------------------------------------------------------
 %% @spec
-%% @doc handle POST message
+%% @doc handle POST / GET Comet messages
 %% @end 
 %%--------------------------------------------------------------------
 handle(Req, 'POST') ->
