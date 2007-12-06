@@ -138,17 +138,22 @@ replace_connection(ClientId, Pid) ->
     F1 = fun() ->
         mnesia:read({connection, ClientId})
     end,
-    {atomic, Row} = mnesia:transaction(F1),
-    {Status, F2} = case Row of
-        [] ->
-            {new, fun() -> mnesia:write(E) end};            
-        [_] ->
-            {replaced, fun() -> mnesia:write(E) end}
+    {Status, F2} = case mnesia:transaction(F1) of
+        {atomic, Row} ->
+            case Row of
+                [] ->
+                    {new, fun() -> mnesia:write(E) end};            
+                [_] ->
+                    {replaced, fun() -> mnesia:write(E) end}
+            end;
+        _ ->
+            {new, fun() -> mnesia:write(E) end}
     end,
-    case mnesia:transaction(F2) of
+    R = case mnesia:transaction(F2) of
         {atomic, ok} -> {ok, Status};
         _ -> error
-    end.   
+    end,
+    io:format("TRACE ~p:~p Other ~p~n",[?MODULE, ?LINE, R]).
        
           
 %%--------------------------------------------------------------------
@@ -170,14 +175,18 @@ connection(ClientId) ->
     F = fun() ->
         mnesia:read({connection, ClientId})
     end,
-    {atomic, Row} = mnesia:transaction(F),
-    case Row of
-        [] ->
-            undefined;
-        [{connection, ClientId, Pid}] ->
-            Pid
+    case mnesia:transaction(F) of
+        {atomic, Row} ->
+            case Row of
+                [] ->
+                    undefined;
+                [{connection, ClientId, Pid}] ->
+                    Pid
+            end;
+        _ ->
+            undefined
     end.
-
+    
 
 %%--------------------------------------------------------------------
 %% @spec  
@@ -287,7 +296,9 @@ deliver_to_channel(Channel, Data) ->
             ok;
         {atomic, [{channel, Channel, Ids}] } ->
             [send_event(connection(ClientId), Event) || ClientId <- Ids],
-            ok
+            ok;
+        _ ->
+            {error, channel_not_found}
      end.
 
 
