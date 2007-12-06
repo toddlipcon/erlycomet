@@ -33,7 +33,7 @@
 -author('rsaccon@gmail.com').
 
 %% API
--export ([start/0, stop/0, reload/0]).
+-export ([start/0, stop/0, status/0, reload/0]).
 
 
 %%====================================================================
@@ -58,6 +58,20 @@ start() ->
 stop() ->
 	io:format("Stopping ErlyComet Demo...~n"),
 	application:stop(erlycomet_demo).
+	
+
+%%--------------------------------------------------------------------
+%% @spec () -> any()
+%% @doc stop erlycomet demo application
+%% @end 
+%%--------------------------------------------------------------------
+status() ->
+    Conns = erlycomet_cluster:connections(),
+    io:format("Total commected clients: ~p~n~n",[length(Conns)]),
+    Channels = erlycomet_cluster:channels(),
+    [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ],
+    ok.
+
 
 %%--------------------------------------------------------------------
 %% @spec () -> any()

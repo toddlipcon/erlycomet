@@ -36,8 +36,7 @@
 %% Api
 -export([start/0,
          stop/0,
-         stop/1,
-         status/0]).
+         stop/1]).
 
 
 %% Internal exports
@@ -70,13 +69,7 @@ stop(Name) ->
     clock ! stop,
     mochiweb_http:stop(Name).
 
-            			
-status() ->
-    Conns = erlycomet_cluster:connections(),
-    io:format("Total commected clients: ~p~n~n",[length(Conns)]),
-    Channels = erlycomet_cluster:channels(),
-    [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ],
-    ok.
+
 
 
 %%====================================================================
