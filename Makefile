@@ -54,6 +54,6 @@ runx:
 	-boot start_sasl \
 	-s $(APP_NAME) \
 	-mnesia dir "\"${MNESIA_DATA}\"" \
-	-erlycomet http_port 3001 \
+	-erlycomet_demo http_port 3001 \
 	-sname $(NODE_NAME)x
 	

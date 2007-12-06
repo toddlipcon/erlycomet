@@ -219,7 +219,7 @@ subscribe(ClientId, Channel) ->
                 [ClientId];
             [{channel, Channel, []} ] ->
                 [ClientId];
-            [{channel, Channel, [Ids]} ] ->
+            [{channel, Channel, Ids} ] ->
                 [ClientId | Ids]
         end,
         mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
