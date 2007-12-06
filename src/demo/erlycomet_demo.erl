@@ -29,7 +29,8 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet).
+-module(erlycomet_demo
+).
 -author('rsaccon@gmail.com').
 
 %% API
