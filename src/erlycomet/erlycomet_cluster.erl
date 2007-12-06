@@ -149,11 +149,10 @@ replace_connection(ClientId, Pid) ->
         _ ->
             {new, fun() -> mnesia:write(E) end}
     end,
-    R = case mnesia:transaction(F2) of
+    case mnesia:transaction(F2) of
         {atomic, ok} -> {ok, Status};
         _ -> error
-    end,
-    io:format("TRACE ~p:~p Other ~p~n",[?MODULE, ?LINE, R]).
+    end.
        
           
 %%--------------------------------------------------------------------
