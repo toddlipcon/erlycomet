@@ -67,7 +67,7 @@ stop() ->
 %%--------------------------------------------------------------------
 status() ->
     Conns = erlycomet_cluster:connections(),
-    io:format("Total commected clients: ~p~n~n",[length(Conns)]),
+    io:format("Total connected clients: ~p~n~n",[length(Conns)]),
     Channels = erlycomet_cluster:channels(),
     [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ],
     ok.
