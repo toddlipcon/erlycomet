@@ -29,7 +29,7 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet_app).
+-module(erlycomet_demo_app).
 -author('rsaccon@gmail.com').
 
 -behaviour(application).
@@ -54,7 +54,7 @@
 %% @end 
 %%--------------------------------------------------------------------
 start(_Type, Args) ->
-    erlycomet_sup:start_link(Args).
+    erlycomet_demo_sup:start_link(Args).
 
 
 %%--------------------------------------------------------------------

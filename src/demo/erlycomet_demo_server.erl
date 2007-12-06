@@ -75,7 +75,7 @@ status() ->
     Conns = erlycomet_dist_server:connections(),
     io:format("Total commected clients: ~p~n~n",[length(Conns)]),
     Channels = erlycomet_dist_server:channels(),
-    [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ].
+    [ io:format("Channel: ~p  Connected clients: ~p~n",[Name, length(List)]) || {Name, List} <- Channels ],
     ok.
 
 

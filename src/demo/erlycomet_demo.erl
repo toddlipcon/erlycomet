@@ -29,8 +29,7 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet_demo
-).
+-module(erlycomet_demo).
 -author('rsaccon@gmail.com').
 
 %% API
@@ -48,7 +47,7 @@
 start() -> 
 	io:format("Starting ErlyComet Demo...~n"),
 	ensure_started(crypto),
-	application:start(erlycomet).
+	application:start(erlycomet_demo).
 
 
 %%--------------------------------------------------------------------
@@ -58,7 +57,7 @@ start() ->
 %%--------------------------------------------------------------------
 stop() ->
 	io:format("Stopping ErlyComet Demo...~n"),
-	application:stop(erlycomet).
+	application:stop(erlycomet_demo).
 
 %%--------------------------------------------------------------------
 %% @spec () -> any()

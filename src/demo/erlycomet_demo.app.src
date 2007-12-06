@@ -1,0 +1,19 @@
+{application, erlycomet_demo,
+  [
+    {description, "Erlang Comet Server"},
+    {vsn, "0.1"},
+    {modules, [erlycomet_demo,
+               erlycomet_demo_sup,
+               erlycomet_demo_app,
+			   erlycomet_demo_server,
+               erlycomet_dist_server,
+               gen_server_cluster,
+			   erlycomet_bayeux]},
+    {registered, []},
+    {applications, [kernel,
+                    stdlib]},
+    {included_applications, []},
+    {env, [{http_port, 3000}]},
+    {mod, {erlycomet_demo_app, []}} ]}.
+    
+     
