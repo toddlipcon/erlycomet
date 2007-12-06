@@ -30,7 +30,7 @@
 %%% THE SOFTWARE.
 %%%
 %%%---------------------------------------------------------------------------------------
--module(erlycomet_dist_server).
+-module(erlycomet_cluster).
 -author('rsaccon@gmail.com').
 -author('telarson@gmail.com').
 

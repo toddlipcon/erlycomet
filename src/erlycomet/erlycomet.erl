@@ -31,7 +31,7 @@
 %%%
 %%% @since 2007-11-11 by Roberto Saccon, Tait Larson
 %%%-------------------------------------------------------------------
--module(erlycomet_bayeux).
+-module(erlycomet).
 -author('telarson@gmail.com').
 -author('rsaccon@gmail.com').
 
