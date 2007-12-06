@@ -40,6 +40,7 @@
 -export([handle/2]).
 
 -record(state, {id = undefined,
+                connection_type,
 				events = [],
 				timeout = 1200000,      % 20 min, just for testing
 				callback = undefined}).  
@@ -128,7 +129,7 @@ process_cmd(_Req, "/meta/handshake", _Struct, _) ->
 
 process_cmd(Req, "/meta/connect", Struct, Callback) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    _ConnectionType = get_bayeux_val("connectionType", Struct),
+    ConnectionType = get_bayeux_val("connectionType", Struct),
 	L = [{"channel", "/meta/connect"}, 
          {"clientId", ClientId}],    
     case erlycomet_dist_server:replace_connection(ClientId, self()) of
@@ -138,46 +139,27 @@ process_cmd(Req, "/meta/connect", Struct, Callback) ->
             Msg = {struct, [{"successful", true} | L]},
 	        Resp = Req:respond({200, [], chunked}),
 	        loop(Resp, #state{id = ClientId, 
+	                          connection_type = ConnectionType,
 	                          events = [Msg],
 	                          callback = Callback});
 	    _ ->
         	{struct, [{"successful", false} | L]}
     end;
 	
-process_cmd(_Req, "/meta/disconnect", Struct, _) ->	
+process_cmd(Req, "/meta/disconnect", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
-	L = [{"channel", "/meta/disconnect"}, 
-         {"clientId", ClientId}],
-    case erlycomet_dist_server:remove_connection(ClientId) of
-	    ok -> {struct, [{"successful", true}  | L]};
-  	    _ ->  {struct, [{"successful", false}  | L]}
-	end;    
+    process_cmd2(Req, "/meta/disconnect", ClientId);
 
-process_cmd(_Req, "/meta/subscribe", Struct, _) ->	
+process_cmd(Req, "/meta/subscribe", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
-	L = [{"channel", "/meta/subscribe"}, 
-         {"clientId", ClientId},
-         {"subscription", Subscription}],
-    case erlycomet_dist_server:subscribe(ClientId, Subscription) of
-	    ok -> {struct, [{"successful", true}  | L]};
-  	    _ ->  {struct, [{"successful", false}  | L]}
-	end;	
+	process_cmd2(Req, "/meta/subscribe", ClientId, Subscription);
 	
-process_cmd(_Req, "/meta/unsubcribe", Struct, _) ->	
+process_cmd(Req, "/meta/unsubscribe", Struct, _) ->	
     ClientId = get_bayeux_val("clientId", Struct),
-    %% rsaccon: TODO; what do we do if there is no valid ClientId ?
 	Subscription = get_bayeux_val("subscription", Struct),
-	L = [{"channel", "/meta/unsubcribe"}, 
-         {"clientId", ClientId},
-         {"subscription", Subscription}],          
-    case erlycomet_dist_server:unsubscribe(ClientId, Subscription) of
-	    ok -> {struct, [{"successful", true}  | L]};
-  	    _ ->  {struct, [{"successful", false}  | L]}
-	end;
-			
+	process_cmd2(Req, "/meta/unsubscribe", ClientId, Subscription);	
+	
 process_cmd(_Req, Channel, Struct, _) ->	
     Data = get_bayeux_val("data", Struct),
     L = case get_bayeux_val("clientId", Struct) of
@@ -192,6 +174,38 @@ process_cmd(_Req, Channel, Struct, _) ->
    	    ok -> {struct, [{"successful", true}  | L]};
    	    _ ->  {struct, [{"successful", false}  | L]}
    	end.
+    
+process_cmd2(_, Channel, undefined) ->	
+    {struct, [{"channel", Channel}, {"successful", false}]};
+             	
+process_cmd2(_Req, "/meta/disconnect", ClientId) ->	
+	L = [{"channel", "/meta/disconnect"}, 
+         {"clientId", ClientId}],
+    case erlycomet_dist_server:remove_connection(ClientId) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end.    
+
+process_cmd2(_, Channel, undefined, _) ->	
+    {struct, [{"channel", Channel}, {"successful", false}]};
+                  
+process_cmd2(_Req, "/meta/subscribe", ClientId, Subscription) ->	
+	L = [{"channel", "/meta/subscribe"}, 
+         {"clientId", ClientId},
+         {"subscription", Subscription}],
+    case erlycomet_dist_server:subscribe(ClientId, Subscription) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end;	
+	
+process_cmd2(_Req, "/meta/unsubcribe", ClientId, Subscription) ->	
+	L = [{"channel", "/meta/unsubcribe"}, 
+         {"clientId", ClientId},
+         {"subscription", Subscription}],          
+    case erlycomet_dist_server:unsubscribe(ClientId, Subscription) of
+	    ok -> {struct, [{"successful", true}  | L]};
+  	    _ ->  {struct, [{"successful", false}  | L]}
+	end.
 
 
 callback_wrapper(Data, undefined) ->
@@ -211,29 +225,36 @@ generate_id() ->
     end.
 
 
-loop(Resp, #state{callback = Callback} = State) ->
+loop(Resp, #state{events=Events, id=Id, callback=Callback} = State) ->
     receive
         stop ->  
-            disconnect(Resp, State);
-        {event, Event} -> 
-    		Events = lists:reverse([Event | State#state.events]),
-            Resp:write_chunk(mochijson:encode({array, Events})),
-    		loop(Resp, State#state{events=[]});           
+            disconnect(Resp, Id, State);
+        {add, Event} -> 
+    		loop(Resp, State#state{events=[Event | Events]});      
+        {flush, Event} -> 
+        	Events2 = lists:reverse([Event | Events]),
+        	send(Resp, Events2, Callback),
+        	done;    		     
         flush -> 
-			Events = lists:reverse([State#state.events]),
-			Chunk = callback_wrapper(mochijson:encode({array, Events}), Callback),
-            Resp:write_chunk(Chunk),
-			loop(Resp, State#state{events=[]})
+            Events2 = lists:reverse(Events),
+            send(Resp, Events2, Callback),
+			done 
 	after State#state.timeout ->
-		disconnect(Resp, State)
+		disconnect(Resp, Id, Callback)
     end.
 
 
-disconnect(Resp, #state{callback = Callback} = State) ->
-	erlycomet_dist_server:remove_connection(State#state.id),
+send(Resp, Events, Callback) ->
+	Chunk = callback_wrapper(mochijson:encode({array, Events}), Callback),
+    Resp:write_chunk(Chunk),
+    Resp:write_chunk([]).
+
+    
+disconnect(Resp, Id, Callback) ->
+	erlycomet_dist_server:remove_connection(Id),
 	Msg = {struct, [{"channel", "/meta/disconnect"}, 
                     {"successful", true},
-                    {"clientId", State#state.id}]},
+                    {"clientId", Id}]},
     Chunk = callback_wrapper(mochijson:encode(Msg), Callback),
     Resp:write_chunk(Chunk),
 	Resp:write_chunk([]),

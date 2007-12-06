@@ -37,8 +37,7 @@
 -export([start/0,
          stop/0,
          stop/1,
-         status/0,
-         start_tick/0]).
+         status/0]).
 
 
 %% Internal exports
@@ -51,16 +50,15 @@
 start() ->
 	{ok, App} = application:get_application(),
 	Loop = fun ?MODULE:loop/1,
-	Args = [{ip, "127.0.0.1"},
-	        {loop, Loop}],
-	Args1 = case application:get_env(App, http_port) of
-	            {ok, Port} ->
-	                io:format("Listening on Port: ~p~n",[Port]),
-			        [{port, Port} | Args];
-			    _ ->
-			        Args
-			end,
-	mochiweb_http:start(Args1).
+	Args = case application:get_env(App, http_port) of
+	    {ok, Port} ->
+	        io:format("Listening on Port: ~p~n",[Port]),
+			[{port, Port} | [{loop, Loop}]];
+		_ ->
+		    [{loop, Loop}]
+	end,
+	register(clock, spawn(fun() -> ?MODULE:tick() end)),
+	mochiweb_http:start(Args).
 	
 
 stop() ->
@@ -77,9 +75,6 @@ status() ->
     L = erlycomet_dist_server:connections(),
     io:format("Connections: ~p~n",[L]).
 
-start_tick() ->
-	register(clock, spawn(fun() -> tick() end)).
-
 
 %%====================================================================
 %% Internal exports
@@ -88,12 +83,10 @@ tick() ->
     receive
 	stop ->
 	    void
-    after 1000 ->
+    after 5000 ->
 	    {_,Secs,_} = now(),
         Channel = "/test/time",
-        Data = [struct, 
-            {data, Secs rem 1000},
-            {channel, Channel}],
+        Data = Secs rem 1000,
         erlycomet_dist_server:deliver_to_channel(Channel, Data),
         tick()
     end.

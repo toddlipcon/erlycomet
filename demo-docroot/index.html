@@ -26,7 +26,7 @@
 			    dojox.cometd.subscribe("/test/time", this, "processResponse"); 
 			},
 			processResponse: function(msg){
-				dojo.byId("output").innerHTML = msg.data.seconds;
+				dojo.byId("output").innerHTML = msg.data;
 			}	
 		}
 

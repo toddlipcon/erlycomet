@@ -201,6 +201,7 @@ remove_connection(ClientId) ->
 %% @end 
 %%--------------------------------------------------------------------
 subscribe(ClientId, Channel) ->
+    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, {ClientId, Channel}]),
     F = fun() ->
         ClientIdList = case mnesia:read({channel, Channel}) of
             [] -> 
@@ -210,6 +211,7 @@ subscribe(ClientId, Channel) ->
             [{channel, Channel, [Ids]} ] ->
                 [ClientId | Ids]
         end,
+        io:format("TRACE ~p:~p ClientIdList: ~p~n",[?MODULE, ?LINE, ClientIdList]),
         mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
     end,
     case mnesia:transaction(F) of
@@ -285,8 +287,8 @@ deliver_to_channel(Channel, Data) ->
             {error, channel_not_found};
         {atomic, [{channel, Channel, []}] } -> 
             ok;
-        {atomic, [{channel, Channel, [Ids]}] } -> 
-            [connection(ClientId) ! {event, Event} || ClientId <- Ids],
+        {atomic, [{channel, Channel, Ids}] } ->
+            [send_event(connection(ClientId), Event) || ClientId <- Ids],
             ok
      end.
 
@@ -373,6 +375,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+send_event(Pid, Event) when is_pid(Pid)->
+    Pid ! {flush, Event};
+send_event(_, _) ->
+    ok.
+
 
 mnesia_tables() ->
     [{connection,
