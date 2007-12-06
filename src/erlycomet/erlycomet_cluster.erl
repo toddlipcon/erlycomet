@@ -201,7 +201,6 @@ remove_connection(ClientId) ->
 %% @end 
 %%--------------------------------------------------------------------
 subscribe(ClientId, Channel) ->
-    io:format("TRACE ~p:~p ~p~n",[?MODULE, ?LINE, {ClientId, Channel}]),
     F = fun() ->
         ClientIdList = case mnesia:read({channel, Channel}) of
             [] -> 
