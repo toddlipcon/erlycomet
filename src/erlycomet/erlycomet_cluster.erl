@@ -337,7 +337,7 @@ init([]) ->
 %% @end 
 %%--------------------------------------------------------------------
 handle_call(add_mnesia_slave, From, State) ->
-	mnesia:add_table_copy(schema, From, ram_copies),
+    mnesia:add_table_copy(schema, From, ram_copies),
     {reply, ok, State};
 
 handle_call(_Request, _From, State) ->
@@ -408,20 +408,14 @@ mnesia_tables() ->
        
 
 up_master() ->
-    case mnesia:create_schema([node()]) of
-        {error, {_, {already_exists, _}}} -> 
-            mnesia:start();
-        ok -> 
-            mnesia:start(),
-            lists:foreach(fun ({Name, Args}) ->
-        	    case mnesia:create_table(Name, Args) of
-        			{atomic, ok} -> ok;
-        			{aborted, {already_exists, _}} -> ok
-        		end
-        	end,
-        	mnesia_tables())
-    end.
-    
+    mnesia:start(),
+    lists:foreach(fun ({Name, Args}) ->
+			  case mnesia:create_table(Name, Args) of
+			      {atomic, ok} -> ok;
+			      {aborted, {already_exists, _}} -> ok
+			  end
+		  end,
+		  mnesia_tables()).
 
 do(QLC) ->
     F = fun() ->

@@ -45,13 +45,11 @@ run:	all
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
-	-mnesia dir "\"${MNESIA_DATA}\"" \
 	-sname $(NODE_NAME)
 
 runx:	all
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
-	-mnesia dir "\"${MNESIA_DATA}\"" \
 	-erlycomet_demo http_port 3001 \
 	-sname $(NODE_NAME)x
