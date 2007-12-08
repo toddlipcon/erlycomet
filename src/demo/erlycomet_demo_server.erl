@@ -83,7 +83,7 @@ tick() ->
 	    {_,Secs,_} = now(),
         Channel = "/test/time",
         Data = Secs rem 1000,
-        erlycomet_cluster:deliver_to_channel(Channel, Data),
+        erlycomet_api:deliver_to_channel(Channel, Data),
         tick()
     end.
 

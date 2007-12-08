@@ -131,7 +131,7 @@ process_cmd(Req, "/meta/connect", Struct, Callback) ->
     ConnectionType = get_bayeux_val("connectionType", Struct),
 	L = [{"channel", "/meta/connect"}, 
          {"clientId", ClientId}],    
-    case erlycomet_cluster:replace_connection(ClientId, self()) of
+    case erlycomet_api:replace_connection(ClientId, self()) of
         {ok, new} ->
            {struct, [{"successful", true} | L]};
 	    {ok, replaced} ->	
@@ -171,7 +171,7 @@ process_cmd2(_, Channel, undefined) ->
 process_cmd2(_Req, "/meta/disconnect", ClientId) ->	
 	L = [{"channel", "/meta/disconnect"}, 
          {"clientId", ClientId}],
-    case erlycomet_cluster:remove_connection(ClientId) of
+    case erlycomet_api:remove_connection(ClientId) of
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end. 
@@ -183,7 +183,7 @@ process_cmd2(_Req, "/meta/subscribe", ClientId, Subscription) ->
 	L = [{"channel", "/meta/subscribe"}, 
          {"clientId", ClientId},
          {"subscription", Subscription}],
-    case erlycomet_cluster:subscribe(ClientId, Subscription) of
+    case erlycomet_api:subscribe(ClientId, Subscription) of
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;	
@@ -192,7 +192,7 @@ process_cmd2(_Req, "/meta/unsubscribe", ClientId, Subscription) ->
 	L = [{"channel", "/meta/unsubscribe"}, 
          {"clientId", ClientId},
          {"subscription", Subscription}],          
-    case erlycomet_cluster:unsubscribe(ClientId, Subscription) of
+    case erlycomet_api:unsubscribe(ClientId, Subscription) of
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;
@@ -200,7 +200,7 @@ process_cmd2(_Req, "/meta/unsubscribe", ClientId, Subscription) ->
 process_cmd2(_Req, Channel, ClientId, Data) ->	
     L = [{"channel", Channel}, 
          {"clientId", ClientId}],
-    case erlycomet_cluster:deliver_to_channel(Channel, Data) of
+    case erlycomet_api:deliver_to_channel(Channel, Data) of
         ok -> {struct, [{"successful", true}  | L]};
         _ ->  {struct, [{"successful", false}  | L]}
     end.
@@ -214,7 +214,7 @@ callback_wrapper(Data, Callback) ->
 generate_id() ->
     <<Num:128>> = crypto:rand_bytes(16),
     [HexStr] = io_lib:fwrite("~.16B",[Num]),
-    case erlycomet_cluster:connection(HexStr) of
+    case erlycomet_api:connection(HexStr) of
         undefined ->
             HexStr;
      _ ->
@@ -248,7 +248,7 @@ send(Resp, Events, Callback) ->
 
     
 disconnect(Resp, Id, Callback) ->
-	erlycomet_cluster:remove_connection(Id),
+	erlycomet_api:remove_connection(Id),
 	Msg = {struct, [{"channel", "/meta/disconnect"}, 
                     {"successful", true},
                     {"clientId", Id}]},
