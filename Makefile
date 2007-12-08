@@ -4,12 +4,6 @@ MNESIA_DATA=mnesia-data
 NODE_NAME=$(APP_NAME)
 VSN=0.1
 
-# The following properties are only required for creating and hosting a dojo xdomain build. 
-#
-APP_ROOT=~/opensource/$(APP_NAME)
-XD_DOJO_PATH=http://rsaccon.googlepages.com
-DOJO_ROOT=~/opensource/dojo-release-1.0.1-src
-
 all:
 	( $(ERL) -make && \
 	if [ ! -e ebin/$(APP_NAME).app ]; then cp -f src/demo/$(APP_NAME).app.src ebin/$(APP_NAME).app; fi )
@@ -28,25 +22,15 @@ clean-doc:
 	rm -fv doc/edoc-info
 	rm -fv doc/*.css
 
-dojo:
-	( cd $(DOJO_ROOT)/util/buildscripts && ./build.sh \
-	loader=xdomain \
-	xdDojoPath=$(XD_DOJO_PATH) \
-	profile=cometd \
-	releaseName=comet-xdomain-build \
-	internStrings=true \
-	copyTests=false \
-	cssOptimize=comments \
-	optimize=shrinksafe \
-	layerOptimize=shrinksafe \
-	action=release )
-
 run:	all
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
 	-sname $(NODE_NAME)
 
+# Starts a node at a different port (3001).
+# You can load demo page from this server to do comet x-domain access to default server at port 3000.
+#
 runx:	all
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
