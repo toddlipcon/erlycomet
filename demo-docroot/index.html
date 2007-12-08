@@ -32,7 +32,7 @@
 			      dojo.byId("counter_button").innerHTML = "stop";
 			    } else {
 			      dojox.cometd.unsubscribe("/test/time"); 
-			      dojo.byId("counter_output").innerHTML = "-";
+			      dojo.byId("counter_output").innerHTML = "";
 			      dojo.byId("counter_button").innerHTML = "start";				   
 			    }
 			},
@@ -40,6 +40,23 @@
 				dojo.byId("counter_output").innerHTML = msg.data;
 			}	
 		}
+		
+		var rpc = {
+			_id:0,
+			invoke: function(){
+				var text = dojo.byId('rpc_text').value;
+				var delay = dojo.byId('rpc_delay').value;
+				dojox.cometd.startBatch();
+			    dojox.cometd.subscribe("/rpc/test", this, "result"); 	
+			    dojox.cometd.publish("/rpc/test", { id:rpc._id, method:"delayed_echo", params:[text, delay]});				
+			    dojox.cometd.endBatch();
+			    rpc._id = rpc._id + 1;		   
+			},
+			result: function(msg){
+				dojo.byId("rpc_output").innerHTML = msg.data.result;
+				dojox.cometd.unsubscribe("/rpc/test"); 
+			}	
+		}		
 		
 		var room = {
 		    _last: "",
@@ -177,35 +194,32 @@
 		dojo.addOnLoad(function(){
 		   dojox.cometd.init("http://localhost:3000/cometd");
 		   dojo.connect(dojo.byId("counter_button"), "onclick", counter, "start_stop");
+		   dojo.connect(dojo.byId("rpc_button"), "onclick", rpc, "invoke");
 		});
 		dojo.addOnLoad(room, "_init");
 		
+		dojo.addOnUnload(room,"leave");	
 		dojo.addOnUnload(function(){
 		   dojox.cometd.disconnect();
 		});	
-		dojo.addOnUnload(room,"leave");	
 					
 	</script>
 	
 	<style>
-	p 
-	{ 
-	  margin-bottom: 35px; 
-	}
 		
 	div 
 	{ 
 	  border: 0px solid black; 
 	}
 
-	div#chatroom
+	div.container
 	{
 	  background-color: #e0e0e0;
 	  border: 1px solid black; 
 	  width: 45em;
 	}
 
-	div#chat
+	div.output
 	{
 	  height: 20ex;
 	  overflow: auto; 
@@ -214,7 +228,7 @@
 	  border: 0px solid black; 
 	}
 
-	div#input
+	div.input
 	{
 	  clear: both;
 	  padding: 4px;
@@ -222,6 +236,18 @@
 	  border-top: 1px solid black; 
 	}
 
+	input#rpc_text
+	{
+	  width:28em;
+	  background-color: #e0f0f0;
+	}
+
+	input#rpc_delay
+	{
+	  width:7em;
+	  background-color: #e0f0f0;
+	}
+	
 	input#phrase
 	{
 	  width:28em;
@@ -248,38 +274,63 @@
 	{
 	  font-style: italic;
 	}
+
+	h2
+	{
+	  color: #333333;
+	}
+		
+	h3
+	{
+	  color: #444444;
+	  margin-bottom: 5px;
+	}
 	</style>
 		
 </head>
 <body>
-	<h1>ErlyComet Demos</h1>
-	<p>
-		<h3>1. Epoch-time-mod-1000 counter</h3>
-		<button id="counter_button">start</button>&nbsp;
-		<b><span id="counter_output">-</span></b>&nbsp;&nbsp;
-		(counter implemented at server side, value gets pushed to browser)
-	</p>
+	<h2>ErlyComet Demos</h2>
 
-	<p>
-		<h3>2. RPC</h3>
-	</p>
-			
-	<p>
-		<h3>3. Simple Chat (code from: http://cometd.com/ SVN repository)</h3>	
-	 	<div id="chatroom">
-   			<div id="chat"></div>
-   			<div id="input">
-     			<div id="join" >
-       				Username:&nbsp;<input id="username" type="text"/><input id="joinB" class="button" type="submit" name="join" value="Join"/>
-     			</div>
-     			<div id="joined" class="hidden">
-       				Chat:&nbsp;<input id="phrase" type="text"></input>
-       				<input id="sendB" class="button" type="submit" name="join" value="Send"/>
-       				<input id="leaveB" class="button" type="submit" name="join" value="Leave"/>
-     			</div>
+	<h3>1. Epoch-time-mod-1000 counter</h3>
+	<div class="container">
+   		<div id="counter_output" class="output" style="height:3ex"></div>
+   		<div class="input">
+    		<div>
+       			Server side implemented counter:&nbsp;
+				<button id="counter_button">start</button>
+     		</div>
+    	</div>
+   	</div>
+
+	<h3>2. RPC - delayed echo</h3>
+	<div class="container">
+   		<div id="rpc_output" class="output" style="height:3ex"></div>
+   		<div class="input">
+    		<div>
+    			Value:
+				<input id="rpc_text" type="text">&nbsp;&nbsp;
+				Delay (in sec.):
+				<input id="rpc_delay" type="text">&nbsp;
+                <input id="echo_button" class="button" type="submit" name="join" value="Invoke">
     		</div>
-   		</div>	
-	</p>
+    	</div>
+   	</div>		
+	
+	<h3>3. Simple Chat (code from: http://cometd.com/ SVN repository)</h3>	
+ 	<div class="container">
+		<div id="chat" class="output" style="height:14ex"></div>
+		<div class="input">
+			<div id="join" >
+   				Username:&nbsp;<input id="username" type="text"><input id="joinB" class="button" type="submit" name="join" value="Join"/>
+  			</div>
+   			<div id="joined" class="hidden">
+   				Chat:&nbsp;<input id="phrase" type="text">
+   				<input id="sendB" class="button" type="submit" name="join" value="Send">
+   				<input id="leaveB" class="button" type="submit" name="join" value="Leave">
+   			</div>
+   		</div>
+	</div>	
+
 </body>
 
 

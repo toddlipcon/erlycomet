@@ -230,7 +230,7 @@ channels() ->
 %% @doc
 %% delivers data to one connection
 %% @end 
-%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------    
 deliver_to_connection(ClientId, Channel, Data) ->
     Event = {struct, [{"channel", Channel}, 
                       {"data", Data}]},

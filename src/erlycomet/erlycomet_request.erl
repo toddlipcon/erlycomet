@@ -158,7 +158,19 @@ process_cmd(Req, "/meta/unsubscribe", Struct, _) ->
     ClientId = get_bayeux_val("clientId", Struct),
 	Subscription = get_bayeux_val("subscription", Struct),
 	process_cmd2(Req, "/meta/unsubscribe", ClientId, Subscription);	
-	
+
+%% Example custom RPC application
+%% TODO: needs to seperated from Comet core and made pluggable
+%%
+process_cmd(Req, "/rpc/test"=Channel, Struct, _) ->  
+    ClientId = get_bayeux_val("clientId", Struct),
+    Data = get_bayeux_val("data", Struct),
+    RpcId = get_bayeux_val("id", Data),
+    Method = get_bayeux_val("method", Data),
+    {array, Paramters} = get_bayeux_val("params", Data),
+    Result = {struct, [{"result", "not implemented yet"}, {"error", null}, {"id", RpcId}]},
+	process_cmd2(Req, Channel, ClientId, Result);
+    		
 process_cmd(Req, Channel, Struct, _) ->
     ClientId = get_bayeux_val("clientId", Struct),
     Data = get_bayeux_val("data", Struct),
@@ -196,6 +208,7 @@ process_cmd2(_Req, "/meta/unsubscribe", ClientId, Subscription) ->
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;
+
 
 process_cmd2(_Req, Channel, ClientId, Data) ->	
     L = [{"channel", Channel}, 
