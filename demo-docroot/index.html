@@ -41,7 +41,7 @@
 			}	
 		}
 		
-		var chat = {
+		var room = {
 		    _last: "",
 		    _username: null,
 
@@ -178,12 +178,12 @@
 		   dojox.cometd.init("http://localhost:3000/cometd");
 		   dojo.connect(dojo.byId("counter_button"), "onclick", counter, "start_stop");
 		});
-		dojo.addOnLoad(chat, "_init");
+		dojo.addOnLoad(room, "_init");
 		
 		dojo.addOnUnload(function(){
 		   dojox.cometd.disconnect();
 		});	
-		dojo.addOnUnload(chat,"leave");	
+		dojo.addOnUnload(room,"leave");	
 					
 	</script>
 	
