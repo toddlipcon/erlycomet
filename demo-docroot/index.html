@@ -25,7 +25,7 @@
 	<script type="text/javascript">	
         dojo.require("dojox.cometd");
 
-		Counter = {
+		var counter = {
 			start_stop: function(){
 				if (dojo.byId("counter_button").innerHTML == "start"){
 			      dojox.cometd.subscribe("/test/time", this, "update"); 
@@ -40,25 +40,246 @@
 				dojo.byId("counter_output").innerHTML = msg.data;
 			}	
 		}
+		
+		var chat = {
+		    _last: "",
+		    _username: null,
+
+		    join: function(name){
+
+		        if(name == null || name.length==0 ){
+		            alert('Please enter a username!');
+		        }else{
+
+		            this._username=name;
+		            dojo.byId('join').className='hidden';
+		            dojo.byId('joined').className='';
+		            dojo.byId('phrase').focus();
+
+		            // subscribe and join
+			        dojox.cometd.startBatch();
+		            dojox.cometd.subscribe("/chat/demo", room, "_chat");
+		            dojox.cometd.publish("/chat/demo", { user: room._username, join: true, chat : room._username+" has joined"});
+			        dojox.cometd.endBatch();
+
+		            // handle cometd failures while in the room
+		            room._meta=dojo.subscribe("/cometd/meta",function(event){
+		                console.debug(event);   
+		                if (event.action=="handshake") {
+			                room._chat({data:{join:true,user:"SERVER",chat:"reconnected"}});
+		                    dojox.cometd.subscribe("/chat/demo", room, "_chat");
+		                } else if (event.action=="connect" && !event.successful) {
+		                    room._chat({data:{leave:true,user:"SERVER",chat:"disconnected!"}});
+			        }
+		            });
+		        }
+		    },
+
+		    leave: function(){
+		        if (room._username==null) {
+		            return;
+				}
+
+				if (room._meta) {
+		    		dojo.unsubscribe(room._meta);
+				}
+				room._meta=null;
+
+				dojox.cometd.startBatch();
+		    	dojox.cometd.unsubscribe("/chat/demo", room, "_chat");
+		    	dojox.cometd.publish("/chat/demo", { user: room._username, leave: true, chat : room._username+" has left"});
+				dojox.cometd.endBatch();
+
+		        // switch the input form
+		        dojo.byId('join').className='';
+		        dojo.byId('joined').className='hidden';
+		        dojo.byId('username').focus();
+		        room._username=null;
+		    },
+
+		    chat: function(text){
+		        if(!text || !text.length){ return false; }
+		        dojox.cometd.publish("/chat/demo", { user: room._username, chat: text});
+		    },
+
+		    _chat: function(message){
+		        var chat=dojo.byId('chat');
+		        if(!message.data){
+		            alert("bad message format "+message);
+		            return;
+		        }
+		        var from=message.data.user;
+		        var special=message.data.join || message.data.leave;
+		        var text=message.data.chat;
+		        if(!text){ return; }
+
+		        if( !special && from == room._last ){
+		            from="...";
+		        }else{
+		            room._last=from;
+		            from+=":";
+		        }
+
+		        if(special){
+		            chat.innerHTML += "<span class=\"alert\"><span class=\"from\">"+from+"&nbsp;</span><span class=\"text\">"+text+"</span></span><br/>";
+		            room._last="";
+		        }else{
+		            chat.innerHTML += "<span class=\"from\">"+from+"&nbsp;</span><span class=\"text\">"+text+"</span><br/>";
+		        } 
+		        chat.scrollTop = chat.scrollHeight - chat.clientHeight;    
+		    },
+
+		    _init: function(){
+		        dojo.byId('join').className='';
+		        dojo.byId('joined').className='hidden';
+		        dojo.byId('username').focus();
+
+		        var element=dojo.byId('username');
+		        element.setAttribute("autocomplete","OFF"); 
+		        dojo.connect(element, "onkeyup", function(e){   
+		            if(e.keyCode == dojo.keys.ENTER){
+		                room.join(dojo.byId('username').value);
+		                return false;
+		            }
+		            return true;
+			    });
+
+		        element=dojo.byId('joinB');
+		        element.onclick = function(){
+		            room.join(dojo.byId('username').value);
+		            return false;
+			    }
+
+		        element=dojo.byId('phrase');
+		        element.setAttribute("autocomplete","OFF");
+		        dojo.connect(element, "onkeyup", function(e){   
+		            if(e.keyCode == dojo.keys.ENTER){
+		                room.chat(dojo.byId('phrase').value);
+		                dojo.byId('phrase').value='';
+		                return false;
+		            }
+		            return true;
+			    });
+
+		        element=dojo.byId('sendB');
+		        element.onclick = function(){
+		        	room.chat(dojo.byId('phrase').value);
+		        	dojo.byId('phrase').value='';
+				}
+
+		        element=dojo.byId('leaveB');
+		        element.onclick = function(){
+		        	room.leave();
+				}
+		    } 
+		};
 
 		dojo.addOnLoad(function(){
 		   dojox.cometd.init("http://localhost:3000/cometd");
-		   dojo.connect(dojo.byId("counter_button"), "onclick", Counter, "start_stop");
+		   dojo.connect(dojo.byId("counter_button"), "onclick", counter, "start_stop");
 		});
+		dojo.addOnLoad(chat, "_init");
+		
 		dojo.addOnUnload(function(){
 		   dojox.cometd.disconnect();
-		});		
+		});	
+		dojo.addOnUnload(chat,"leave");	
+					
 	</script>
+	
+	<style>
+	p 
+	{ 
+	  margin-bottom: 35px; 
+	}
+		
+	div 
+	{ 
+	  border: 0px solid black; 
+	}
+
+	div#chatroom
+	{
+	  background-color: #e0e0e0;
+	  border: 1px solid black; 
+	  width: 45em;
+	}
+
+	div#chat
+	{
+	  height: 20ex;
+	  overflow: auto; 
+	  background-color: #f0f0f0;
+	  padding: 4px;
+	  border: 0px solid black; 
+	}
+
+	div#input
+	{
+	  clear: both;
+	  padding: 4px;
+	  border: 0px solid black; 
+	  border-top: 1px solid black; 
+	}
+
+	input#phrase
+	{
+	  width:28em;
+	  background-color: #e0f0f0;
+	}
+
+	input#username
+	{
+	  width:14em;
+	  background-color: #e0f0f0;
+	}
+
+	div.hidden
+	{
+	  display: none;
+	}
+
+	span.from
+	{
+	  font-weight: bold;
+	}
+
+	span.alert
+	{
+	  font-style: italic;
+	}
+	</style>
 		
 </head>
 <body>
-	<h1>Simple ErlyComet Demos</h1>
+	<h1>ErlyComet Demos</h1>
 	<p>
 		<h3>1. Epoch-time-mod-1000 counter</h3>
 		<button id="counter_button">start</button>&nbsp;
 		<b><span id="counter_output">-</span></b>&nbsp;&nbsp;
 		(counter implemented at server side, value gets pushed to browser)
-	</p>	
+	</p>
+
+	<p>
+		<h3>2. RPC</h3>
+	</p>
+			
+	<p>
+		<h3>3. Simple Chat (code from: http://cometd.com/ SVN repository)</h3>	
+	 	<div id="chatroom">
+   			<div id="chat"></div>
+   			<div id="input">
+     			<div id="join" >
+       				Username:&nbsp;<input id="username" type="text"/><input id="joinB" class="button" type="submit" name="join" value="Join"/>
+     			</div>
+     			<div id="joined" class="hidden">
+       				Chat:&nbsp;<input id="phrase" type="text"></input>
+       				<input id="sendB" class="button" type="submit" name="join" value="Send"/>
+       				<input id="leaveB" class="button" type="submit" name="join" value="Leave"/>
+     			</div>
+    		</div>
+   		</div>	
+	</p>
 </body>
 
 

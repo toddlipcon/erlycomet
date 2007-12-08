@@ -1,4 +1,9 @@
 ERL=erl
+
+# uncomment line below if you have installed Erlang from http://cean.process-one.net/download/
+#
+# ERL=~/path_to_your_cean/start.sh
+
 APP_NAME=erlycomet_demo
 MNESIA_DATA=mnesia-data
 NODE_NAME=$(APP_NAME)
