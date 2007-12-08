@@ -166,10 +166,11 @@ process_cmd(Req, "/rpc/test"=Channel, Struct, _) ->
     ClientId = get_bayeux_val("clientId", Struct),
     Data = get_bayeux_val("data", Struct),
     RpcId = get_bayeux_val("id", Data),
-    Method = get_bayeux_val("method", Data),
-    {array, Paramters} = get_bayeux_val("params", Data),
-    Result = {struct, [{"result", "not implemented yet"}, {"error", null}, {"id", RpcId}]},
-	process_cmd2(Req, Channel, ClientId, Result);
+    _Method = get_bayeux_val("method", Data),
+    {array, [Text, Delay]} = get_bayeux_val("params", Data),
+    Result = erlycomet_demo_rpc:echo(Text, Delay),
+    ResultJson = {struct, [{"result", Result}, {"error", null}, {"id", RpcId}]},
+	process_cmd2(Req, Channel, ClientId, ResultJson);
     		
 process_cmd(Req, Channel, Struct, _) ->
     ClientId = get_bayeux_val("clientId", Struct),
