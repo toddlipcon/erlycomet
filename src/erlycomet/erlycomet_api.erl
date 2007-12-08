@@ -61,9 +61,9 @@
 %% @end
 %%-------------------------------------------------------------------------
 add_connection(ClientId, Pid) -> 
-    Row = #connection{client_id=ClientId, pid=Pid},
+    E = #connection{client_id=ClientId, pid=Pid},
     F = fun() ->
-		mnesia:write(Row)
+		mnesia:write(E)
 	end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
@@ -83,8 +83,8 @@ replace_connection(ClientId, Pid) ->
         mnesia:read({connection, ClientId})
     end,
     {Status, F2} = case mnesia:transaction(F1) of
-        {atomic, Row} ->
-            case Row of
+        {atomic, E2} ->
+            case E2 of
                 [] ->
                     {new, fun() -> mnesia:write(E) end};            
                 [_] ->
@@ -106,8 +106,7 @@ replace_connection(ClientId, Pid) ->
 %% @end 
 %%--------------------------------------------------------------------    
 connections() -> 
-    Recs = do(qlc:q([X || X <-mnesia:table(connection)])),
-    [{Y,Z} || {connection, Y, Z} <- Recs].
+    do(qlc:q([X || X <-mnesia:table(connection)])).
  
  
 %%--------------------------------------------------------------------
@@ -125,7 +124,7 @@ connection(ClientId) ->
             case Row of
                 [] ->
                     undefined;
-                [{connection, ClientId, Pid}] ->
+                [#connection{pid=Pid}] ->
                     Pid
             end;
         _ ->
@@ -140,9 +139,8 @@ connection(ClientId) ->
 %% @end 
 %%--------------------------------------------------------------------	
 remove_connection(ClientId) ->
-    Oid = {connection, ClientId},
     F = fun() ->
-		mnesia:delete(Oid)
+		mnesia:delete({connection, ClientId})
 	end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
@@ -156,44 +154,64 @@ remove_connection(ClientId) ->
 %% subscribes a client to a channel
 %% @end 
 %%--------------------------------------------------------------------
-subscribe(ClientId, Channel) ->
+subscribe(ClientId, ChannelName) ->
     F = fun() ->
-        ClientIdList = case mnesia:read({channel, Channel}) of
+        Channel = case mnesia:read({channel, ChannelName}) of
             [] -> 
-                [ClientId];
-            [{channel, Channel, []} ] ->
-                [ClientId];
-            [{channel, Channel, Ids} ] ->
-                [ClientId | Ids]
+                #channel{name=ChannelName, client_ids=[ClientId]};
+            [#channel{client_ids=[]}=Channel1] ->
+                Channel1#channel{client_ids=[ClientId]};
+            [#channel{client_ids=Ids}=Channel1] ->
+                Channel1#channel{client_ids=[ClientId | Ids]}
         end,
-        mnesia:write(#channel{channel=Channel, client_ids=ClientIdList})
+        mnesia:write(Channel)
     end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
         _ -> error
     end.
-
-
+    %% 
+    %% rsaccon: loud thinking how to do it with process groups
+    %%
+    %% F = fun() ->
+    %%     case mnesia:read({connection, ClientId}) of
+    %%         [#connection{subscriptions=Subs}=Conn] -> 
+    %%             Subs2 = [ClientId | Subs],
+    %%             mnesia:write(Conn#connection{subscriptions=Subs2});
+    %%     end,
+    %%     case mnesia:read({channel, ChannelName}) of
+    %%         [] -> 
+    %%             pg:create(list_to_atom(Name)),
+    %%             pg:join(list_to_atom(Name), self())
+    %%             mnesia:write(#channel{name=ChannelName});
+    %%         _ ->
+    %%             pg:join(list_to_atom(Name), self());
+    %%     end,
+    %% end,
+    %% case mnesia:transaction(F) of
+    %%     {atomic, ok} -> ok;
+    %%     _ -> error
+    %% end.
+    
+    
 %%--------------------------------------------------------------------
 %% @spec (string(), string()) -> ok | error  
 %% @doc
 %% unsubscribes a client from a channel
 %% @end 
 %%--------------------------------------------------------------------
-unsubscribe(ClientId, Channel) ->
+unsubscribe(ClientId, ChannelName) ->
     F = fun() ->
-		case mnesia:read({channel, Channel}) of
-		    [] ->
-			{error, channel_not_found};
-		    [{channel, Channel, Ids}] ->
-			mnesia:write({channel, Channel, lists:delete(ClientId,  Ids)})
-		end
-	end,
+        case mnesia:read({channel, ChannelName}) of
+            [] ->
+                {error, channel_not_found};
+            [#channel{client_ids=Ids}=Channel] ->
+                mnesia:write(Channel#channel{client_ids = lists:delete(ClientId,  Ids)})
+        end
+    end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
-        O ->
-            io:format("TRACE ~p:~p remove ~p~n",[?MODULE, ?LINE, O]),
-            error
+        _ -> error
     end.
 
 
@@ -204,9 +222,7 @@ unsubscribe(ClientId, Channel) ->
 %% @end 
 %%--------------------------------------------------------------------
 channels() ->
-    Recs = do(qlc:q([X || X <-mnesia:table(channel)])),
-    [{Y,Z} || {channel, Y, Z} <- Recs].
-
+    do(qlc:q([X || X <-mnesia:table(channel)])).
 
 
 %%--------------------------------------------------------------------
@@ -224,8 +240,8 @@ deliver_to_connection(ClientId, Channel, Data) ->
     case mnesia:transaction(F) of 
 		{atomic, []} ->
 		    {error, connection_not_found};
-		{atomic, [{connection, ClientId, Pid}] } -> 
-		    Pid ! {event, Event},
+		{atomic, [#connection{pid=Pid}]} -> 
+		    Pid ! {flush, Event},
 		    ok
 	end.
 	
@@ -243,13 +259,14 @@ deliver_to_channel(Channel, Data) ->
         mnesia:read({channel, Channel})
     end,
     case mnesia:transaction(F) of 
-        {atomic, []} ->
-            {error, channel_not_found};
         {atomic, [{channel, Channel, []}] } -> 
             ok;
         {atomic, [{channel, Channel, Ids}] } ->
             [send_event(connection(ClientId), Event) || ClientId <- Ids],
             ok;
+        %% {atomic, [#channel{name=Name}]} ->
+        %%     pg:esend(list_to_atom(Name), {flush, Event});
+        %%     ok; 
         _ ->
             {error, channel_not_found}
      end.
