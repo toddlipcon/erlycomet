@@ -247,7 +247,9 @@ unsubscribe(ClientId, Channel) ->
 	end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
-        _ -> error
+        O ->
+            io:format("TRACE ~p:~p remove ~p~n",[?MODULE, ?LINE, O]),
+            error
     end.
 
 

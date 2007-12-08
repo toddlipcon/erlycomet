@@ -13,7 +13,8 @@
 		djConfig="isDebug: true"
 		src="http://o.aolcdn.com/dojo/1.0.0/dojo/dojo.xd.js"></script>
 	
-	<!--  for debugging cometd.js comment the script above and uncomment the script below -->
+	<!-- for debugging cometd.js comment the script above and uncomment the script below -->
+	<!-- (only makes sense if you put a local dojo and dojox in demo-docroot             -->  
 	
     <!--
 	<script type="text/javascript"
@@ -24,27 +25,39 @@
 	<script type="text/javascript">	
         dojo.require("dojox.cometd");
 
-		Commands = {
-			showCounter: function(){
-			    dojox.cometd.subscribe("/test/time", this, "processResponse"); 
+		Counter = {
+			start_stop: function(){
+				if (dojo.byId("counter_button").innerHTML == "start"){
+			      dojox.cometd.subscribe("/test/time", this, "update"); 
+			      dojo.byId("counter_button").innerHTML = "stop";
+			    } else {
+			      dojox.cometd.unsubscribe("/test/time"); 
+			      dojo.byId("counter_output").innerHTML = "-";
+			      dojo.byId("counter_button").innerHTML = "start";				   
+			    }
 			},
-			processResponse: function(msg){
-				dojo.byId("output").innerHTML = msg.data;
+			update: function(msg){
+				dojo.byId("counter_output").innerHTML = msg.data;
 			}	
 		}
 
 		dojo.addOnLoad(function(){
 		   dojox.cometd.init("http://localhost:3000/cometd");
-		   dojo.connect(dojo.byId("testButton"), "onclick", Commands, "showCounter");
+		   dojo.connect(dojo.byId("counter_button"), "onclick", Counter, "start_stop");
 		});
+		dojo.addOnUnload(function(){
+		   dojox.cometd.disconnect();
+		});		
 	</script>
 		
 </head>
 <body>
-	<h1>ErlyComet Demo 1</h1>
+	<h1>Simple ErlyComet Demos</h1>
 	<p>
-		<button id="testButton">starts epoch time mod 1000 counter:</button>
-		<span id="output"></span>
+		<h3>1. Epoch-time-mod-1000 counter</h3>
+		<button id="counter_button">start</button>&nbsp;
+		<b><span id="counter_output">-</span></b>&nbsp;&nbsp;
+		(counter implemented at server side, value gets pushed to browser)
 	</p>	
 </body>
 

@@ -159,20 +159,11 @@ process_cmd(Req, "/meta/unsubscribe", Struct, _) ->
 	Subscription = get_bayeux_val("subscription", Struct),
 	process_cmd2(Req, "/meta/unsubscribe", ClientId, Subscription);	
 	
-process_cmd(_Req, Channel, Struct, _) ->	
+process_cmd(Req, Channel, Struct, _) ->
+    ClientId = get_bayeux_val("clientId", Struct),
     Data = get_bayeux_val("data", Struct),
-    L = case get_bayeux_val("clientId", Struct) of
-        undefined ->
-            %% rsaccon: TODO; do we actually allow that ?
-            [{"channel", Channel}];
-        ClientId ->
-            [{"channel", Channel}, 
-             {"clientId", ClientId}]
-    end,    
-    case erlycomet_cluster:deliver_to_channel(Channel, Data) of
-   	    ok -> {struct, [{"successful", true}  | L]};
-   	    _ ->  {struct, [{"successful", false}  | L]}
-   	end.
+	process_cmd2(Req, Channel, ClientId, Data).   
+    
     
 process_cmd2(_, Channel, undefined) ->	
     {struct, [{"channel", Channel}, {"successful", false}]};
@@ -183,8 +174,8 @@ process_cmd2(_Req, "/meta/disconnect", ClientId) ->
     case erlycomet_cluster:remove_connection(ClientId) of
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
-	end.    
-
+	end. 
+    	
 process_cmd2(_, Channel, undefined, _) ->	
     {struct, [{"channel", Channel}, {"successful", false}]};
                   
@@ -197,16 +188,23 @@ process_cmd2(_Req, "/meta/subscribe", ClientId, Subscription) ->
   	    _ ->  {struct, [{"successful", false}  | L]}
 	end;	
 	
-process_cmd2(_Req, "/meta/unsubcribe", ClientId, Subscription) ->	
-	L = [{"channel", "/meta/unsubcribe"}, 
+process_cmd2(_Req, "/meta/unsubscribe", ClientId, Subscription) ->	
+	L = [{"channel", "/meta/unsubscribe"}, 
          {"clientId", ClientId},
          {"subscription", Subscription}],          
     case erlycomet_cluster:unsubscribe(ClientId, Subscription) of
 	    ok -> {struct, [{"successful", true}  | L]};
   	    _ ->  {struct, [{"successful", false}  | L]}
-	end.
+	end;
 
-
+process_cmd2(_Req, Channel, ClientId, Data) ->	
+    L = [{"channel", Channel}, 
+         {"clientId", ClientId}],
+    case erlycomet_cluster:deliver_to_channel(Channel, Data) of
+        ok -> {struct, [{"successful", true}  | L]};
+        _ ->  {struct, [{"successful", false}  | L]}
+    end.
+    	
 callback_wrapper(Data, undefined) ->
     Data;		
 callback_wrapper(Data, Callback) ->
