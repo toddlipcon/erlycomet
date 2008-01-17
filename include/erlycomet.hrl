@@ -31,7 +31,7 @@
 %%%
 %%%---------------------------------------------------------------------------------------
 
--record(connection, {client_id, pid}).
+-record(connection, {client_id, pid, comment_filtered}).
 %%-record(connection, {client_id, pid, subscriptions}).   %% rsaccon: with process groups
 
 -record(channel, {name, client_ids}).

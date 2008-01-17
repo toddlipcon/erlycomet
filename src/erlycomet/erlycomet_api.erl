@@ -40,8 +40,10 @@
 %% API
 -export([add_connection/2,
          replace_connection/2,
+         replace_connection/3,
          connections/0,
          connection/1,
+	 connection_pid/1,
          remove_connection/1,
          subscribe/2,
          unsubscribe/2,
@@ -70,29 +72,37 @@ add_connection(ClientId, Pid) ->
         _ -> error
     end.
  
- 
 %%-------------------------------------------------------------------------
-%% @spec (string(), pid()) -> {ok, new} | {ok, replaced} | error 
+%% @spec (string(), pid(), CommentFiltered) -> {ok, new} | {ok, replaced} | error 
 %% @doc
 %% replaces a connection
 %% @end
 %%-------------------------------------------------------------------------
-replace_connection(ClientId, Pid) -> 
-    E = #connection{client_id=ClientId, pid=Pid},
+replace_connection(ClientId, Pid) ->
+    replace_connection(ClientId, Pid, not_specified).
+
+replace_connection(ClientId, Pid, CommentFiltered) -> 
+    E = #connection{client_id=ClientId, pid=Pid, comment_filtered=CommentFiltered},
     F1 = fun() ->
         mnesia:read({connection, ClientId})
     end,
     {Status, F2} = case mnesia:transaction(F1) of
-        {atomic, E2} ->
-            case E2 of
-                [] ->
-                    {new, fun() -> mnesia:write(E) end};            
-                [_] ->
-                    {replaced, fun() -> mnesia:write(E) end}
-            end;
-        _ ->
-            {new, fun() -> mnesia:write(E) end}
-    end,
+		       {atomic, EA} ->
+			   case EA of
+			       [] ->
+				   {new, fun() -> mnesia:write(E) end};
+			       [#connection{comment_filtered=CF}] ->
+				   ER = case CommentFiltered of
+					    not_specified ->
+						E#connection{comment_filtered=CF};
+					    _ ->
+						E
+					end,
+			           {replaced, fun() -> mnesia:write(ER) end}
+			   end;
+		       _ ->
+			   {new, fun() -> mnesia:write(E) end}
+		   end,
     case mnesia:transaction(F2) of
         {atomic, ok} -> {ok, Status};
         _ -> error
@@ -107,30 +117,37 @@ replace_connection(ClientId, Pid) ->
 %%--------------------------------------------------------------------    
 connections() -> 
     do(qlc:q([X || X <-mnesia:table(connection)])).
- 
- 
+  
+connection(ClientId) ->
+    F = fun() ->
+		mnesia:read({connection, ClientId})
+	end,
+    case mnesia:transaction(F) of
+        {atomic, Row} ->
+            case Row of
+                [] ->
+                    undefined;
+                Conn ->
+                    Conn
+            end;
+        _ ->
+            undefined
+    end.
+
+
 %%--------------------------------------------------------------------
 %% @spec (string()) -> pid()
 %% @doc 
 %% returns the PID of a connection if it exists
 %% @end 
 %%--------------------------------------------------------------------    
-connection(ClientId) ->
-    F = fun() ->
-        mnesia:read({connection, ClientId})
-    end,
-    case mnesia:transaction(F) of
-        {atomic, Row} ->
-            case Row of
-                [] ->
-                    undefined;
-                [#connection{pid=Pid}] ->
-                    Pid
-            end;
-        _ ->
-            undefined
-    end.
-    
+connection_pid(ClientId) ->
+    case connection(ClientId) of
+	#connection{pid=Pid} ->
+	    Pid;
+	undefined ->
+	    undefined
+    end.    
 
 %%--------------------------------------------------------------------
 %% @spec (string()) -> ok | error  
@@ -262,7 +279,7 @@ deliver_to_channel(Channel, Data) ->
         {atomic, [{channel, Channel, []}] } -> 
             ok;
         {atomic, [{channel, Channel, Ids}] } ->
-            [send_event(connection(ClientId), Event) || ClientId <- Ids],
+	    [send_event(connection_pid(ClientId), Event) || ClientId <- Ids],
             ok;
         %% {atomic, [#channel{name=Name}]} ->
         %%     pg:esend(list_to_atom(Name), {flush, Event});
