@@ -133,7 +133,7 @@ process_cmd(_Req, "/meta/handshake", Struct, _) ->
 	     _ ->
 		 false
 	 end,
-    erlycomet_api:replace_connection(Id, 0, CF),
+    erlycomet_api:replace_connection(Id, 0, handshake, CF),
     Ext2 = [{"json-comment-filtered", CF}], %not sure if this is necessary 
     Resp = [{channel, "/meta/handshake"}, 
             {version, 1.0},
@@ -150,8 +150,8 @@ process_cmd(Req, "/meta/connect", Struct, Callback) ->
     ConnectionType = get_json_map_val("connectionType", Struct),
     L = [{"channel", "/meta/connect"}, 
          {"clientId", ClientId}],    
-    case erlycomet_api:replace_connection(ClientId, self()) of
-        {ok, new} ->
+    case erlycomet_api:replace_connection(ClientId, self(), connected) of
+        {ok, Status} when Status =:= ok ; Status =:= replaced_hs ->
 	    comment_filter({struct, [{"successful", true} | L]}, erlycomet_api:connection(ClientId));
 %don't reply immediately to new connect message.
 %instead wait. when new message is received, reply to connect and 

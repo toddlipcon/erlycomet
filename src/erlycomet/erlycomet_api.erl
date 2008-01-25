@@ -39,8 +39,8 @@
 
 %% API
 -export([add_connection/2,
-         replace_connection/2,
          replace_connection/3,
+         replace_connection/4,
          connections/0,
          connection/1,
 	 connection_pid/1,
@@ -78,11 +78,11 @@ add_connection(ClientId, Pid) ->
 %% replaces a connection
 %% @end
 %%-------------------------------------------------------------------------
-replace_connection(ClientId, Pid) ->
-    replace_connection(ClientId, Pid, not_specified).
+replace_connection(ClientId, Pid, NewState) ->
+    replace_connection(ClientId, Pid, NewState, not_specified).
 
-replace_connection(ClientId, Pid, CommentFiltered) -> 
-    E = #connection{client_id=ClientId, pid=Pid, comment_filtered=CommentFiltered},
+replace_connection(ClientId, Pid, NewState, CommentFiltered) -> 
+    E = #connection{client_id=ClientId, pid=Pid, comment_filtered=CommentFiltered, state=NewState},
     F1 = fun() ->
         mnesia:read({connection, ClientId})
     end,
@@ -91,14 +91,19 @@ replace_connection(ClientId, Pid, CommentFiltered) ->
 			   case EA of
 			       [] ->
 				   {new, fun() -> mnesia:write(E) end};
-			       [#connection{comment_filtered=CF}] ->
+			       [#connection{comment_filtered=CF, state=State}] ->
 				   ER = case CommentFiltered of
 					    not_specified ->
 						E#connection{comment_filtered=CF};
 					    _ ->
 						E
 					end,
-			           {replaced, fun() -> mnesia:write(ER) end}
+				   case State of
+				       handshake ->
+					   {replaced_hs, fun() -> mnesia:write(ER) end};
+				       _ ->
+					   {replaced, fun() -> mnesia:write(ER) end}
+				   end
 			   end;
 		       _ ->
 			   {new, fun() -> mnesia:write(E) end}
@@ -127,7 +132,7 @@ connection(ClientId) ->
             case Row of
                 [] ->
                     undefined;
-                Conn ->
+                [Conn] ->
                     Conn
             end;
         _ ->
