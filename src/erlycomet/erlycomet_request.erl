@@ -94,8 +94,18 @@ handle(Req, _) ->
 process_bayeux_msg(Req, {Type, Content}=Struct, Callback) ->
     case Type of
 	array  -> 
-	    {array, [ process_msg(Req, M, Callback) || M <- Content ]};
-	
+	    %{array, [ process_msg(Req, M, Callback) || M <- Content ]},
+	    %should be refactored.
+	    %ugly hack. somewhat dangerous as it expects all or none of the messages
+	    %to be marked at comment filtered.
+	    Out  = [ process_msg(Req, M, Callback) || M <- Content ],
+	    Out2 = [ Msg || {comment, Msg} <- Out],
+	    case Out2 of 
+		[] ->
+		    {array, Out};
+		_ ->
+		    {comment, {array, Out2}}
+	    end;
 	struct -> 
 	    %{array, [ process_msg(Req, Msgs) ]}  ???????????
 	    process_msg(Req, Struct, Callback)
@@ -253,8 +263,11 @@ json_decode(Str) ->
     mochijson:decode(comment_filter_decode(Str)).
 
 json_encode({comment, Body}) ->
+    error_logger:info_report("json_encode1"),
     comment_filter_encode(mochijson:encode(Body));
 json_encode(Body) ->
+    error_logger:info_report("json_encode2"),
+    error_logger:info_report(Body),
     mochijson:encode(Body).
 
 callback_wrapper(Data, undefined) ->
@@ -277,10 +290,6 @@ comment_filter_decode(Str) ->
 
 comment_filter_encode(Str) ->    
     lists:concat(["/*", Str, "*/"]).
-
-%for testing...no messages will be comment filtered.
-comment_filter(Data, _) ->
-    Data;
 
 comment_filter(Data, #connection{comment_filtered=CF}=_Row) ->
     comment_filter(Data, CF);
