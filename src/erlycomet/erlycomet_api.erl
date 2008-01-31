@@ -188,28 +188,6 @@ subscribe(ClientId, ChannelName) ->
         {atomic, ok} -> ok;
         _ -> error
     end.
-    %% 
-    %% rsaccon: loud thinking how to do it with process groups
-    %%
-    %% F = fun() ->
-    %%     case mnesia:read({connection, ClientId}) of
-    %%         [#connection{subscriptions=Subs}=Conn] -> 
-    %%             Subs2 = [ClientId | Subs],
-    %%             mnesia:write(Conn#connection{subscriptions=Subs2});
-    %%     end,
-    %%     case mnesia:read({channel, ChannelName}) of
-    %%         [] -> 
-    %%             pg:create(list_to_atom(Name)),
-    %%             pg:join(list_to_atom(Name), self())
-    %%             mnesia:write(#channel{name=ChannelName});
-    %%         _ ->
-    %%             pg:join(list_to_atom(Name), self());
-    %%     end,
-    %% end,
-    %% case mnesia:transaction(F) of
-    %%     {atomic, ok} -> ok;
-    %%     _ -> error
-    %% end.
     
     
 %%--------------------------------------------------------------------
@@ -271,6 +249,47 @@ deliver_to_connection(ClientId, Channel, Data) ->
 %% @end 
 %%--------------------------------------------------------------------
 deliver_to_channel(Channel, Data) ->
+    globbing(fun deliver_to_single_channel/2, Channel, Data).
+    
+ 
+%%--------------------------------------------------------------------
+%%% Internal functions
+%%--------------------------------------------------------------------
+
+globbing(Fun, Channel, Data) ->
+    case lists:reverse(Channel) of
+        [$*, $* | T] ->
+            lists:map(fun
+                    (X) ->
+                        case string:str(X, lists:reverse(T)) of
+                            1 ->
+                                Fun(Channel, Data);
+                            _ -> 
+                                skip
+                        end                        
+                end, channels());
+        [$* | T] ->
+            lists:map(fun
+                    (X) ->
+                        case string:str(X, lists:reverse(T)) of
+                            1 -> 
+                                Tokens = string:tokens(string:sub_string(X, length(T) + 1), "/"),
+                                case Tokens of
+                                    [_] ->
+                                        Fun(Channel, Data);
+                                    _ ->
+                                        skip
+                                end;
+                            _ -> 
+                                skip
+                        end                        
+                end, channels());
+        _ ->
+            Fun(Channel, Data)
+    end.
+
+
+deliver_to_single_channel(Channel, Data) ->            
     Event = {struct, [{"channel", Channel}, 
                       {"data", Data}]},                    
     F = fun() -> 
@@ -281,18 +300,11 @@ deliver_to_channel(Channel, Data) ->
             ok;
         {atomic, [{channel, Channel, Ids}] } ->
             [send_event(connection_pid(ClientId), Event) || ClientId <- Ids],
-            ok;
-        %% {atomic, [#channel{name=Name}]} ->
-        %%     pg:esend(list_to_atom(Name), {flush, Event});
-        %%     ok; 
+            ok; 
         _ ->
             {error, channel_not_found}
      end.
-
-
-%%--------------------------------------------------------------------
-%%% Internal functions
-%%--------------------------------------------------------------------
+     
 
 send_event(Pid, Event) when is_pid(Pid)->
     Pid ! {flush, Event};
