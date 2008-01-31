@@ -10,8 +10,7 @@ NODE_NAME=$(APP_NAME)
 VSN=0.1
 
 all:
-	( $(ERL) -make && \
-	if [ ! -e ebin/$(APP_NAME).app ]; then cp -f src/demo/$(APP_NAME).app.src ebin/$(APP_NAME).app; fi )
+	$(ERL) -make
 
 doc:	
 	$(ERL) -pa `pwd`/ebin \
@@ -30,6 +29,7 @@ clean-doc:
 run:	all
 	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
 	-boot start_sasl \
+	-config erlycomet_demo.config \
 	-s $(APP_NAME) \
 	-sname $(NODE_NAME)
 

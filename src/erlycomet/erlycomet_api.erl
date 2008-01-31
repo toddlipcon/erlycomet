@@ -43,7 +43,7 @@
          replace_connection/4,
          connections/0,
          connection/1,
-	 connection_pid/1,
+         connection_pid/1,
          remove_connection/1,
          subscribe/2,
          unsubscribe/2,
@@ -65,8 +65,8 @@
 add_connection(ClientId, Pid) -> 
     E = #connection{client_id=ClientId, pid=Pid},
     F = fun() ->
-		mnesia:write(E)
-	end,
+        mnesia:write(E)
+    end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
         _ -> error
@@ -87,27 +87,27 @@ replace_connection(ClientId, Pid, NewState, CommentFiltered) ->
         mnesia:read({connection, ClientId})
     end,
     {Status, F2} = case mnesia:transaction(F1) of
-		       {atomic, EA} ->
-			   case EA of
-			       [] ->
-				   {new, fun() -> mnesia:write(E) end};
-			       [#connection{comment_filtered=CF, state=State}] ->
-				   ER = case CommentFiltered of
-					    not_specified ->
-						E#connection{comment_filtered=CF};
-					    _ ->
-						E
-					end,
-				   case State of
-				       handshake ->
-					   {replaced_hs, fun() -> mnesia:write(ER) end};
-				       _ ->
-					   {replaced, fun() -> mnesia:write(ER) end}
-				   end
-			   end;
-		       _ ->
-			   {new, fun() -> mnesia:write(E) end}
-		   end,
+        {atomic, EA} ->
+            case EA of
+                [] ->
+                    {new, fun() -> mnesia:write(E) end};
+                    [#connection{comment_filtered=CF, state=State}] ->
+                    ER = case CommentFiltered of
+                        not_specified ->
+                            E#connection{comment_filtered=CF};
+                        _ ->
+                            E
+                    end,
+                    case State of
+                        handshake ->
+                            {replaced_hs, fun() -> mnesia:write(ER) end};
+                        _ ->
+                            {replaced, fun() -> mnesia:write(ER) end}
+                    end
+            end;
+        _ ->
+            {new, fun() -> mnesia:write(E) end}
+    end,
     case mnesia:transaction(F2) of
         {atomic, ok} -> {ok, Status};
         _ -> error
@@ -125,15 +125,13 @@ connections() ->
   
 connection(ClientId) ->
     F = fun() ->
-		mnesia:read({connection, ClientId})
-	end,
+        mnesia:read({connection, ClientId})
+    end,
     case mnesia:transaction(F) of
         {atomic, Row} ->
             case Row of
-                [] ->
-                    undefined;
-                [Conn] ->
-                    Conn
+                [] -> undefined;
+                [Conn] -> Conn
             end;
         _ ->
             undefined
@@ -148,10 +146,8 @@ connection(ClientId) ->
 %%--------------------------------------------------------------------    
 connection_pid(ClientId) ->
     case connection(ClientId) of
-	#connection{pid=Pid} ->
-	    Pid;
-	undefined ->
-	    undefined
+        #connection{pid=Pid} -> Pid;
+        undefined -> undefined
     end.    
 
 %%--------------------------------------------------------------------
@@ -159,15 +155,15 @@ connection_pid(ClientId) ->
 %% @doc
 %% removes a connection
 %% @end 
-%%--------------------------------------------------------------------	
+%%--------------------------------------------------------------------  
 remove_connection(ClientId) ->
     F = fun() ->
-		mnesia:delete({connection, ClientId})
-	end,
+        mnesia:delete({connection, ClientId})
+    end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
         _ -> error
-    end.	
+    end.    
 
 
 %%--------------------------------------------------------------------
@@ -257,16 +253,16 @@ deliver_to_connection(ClientId, Channel, Data) ->
     Event = {struct, [{"channel", Channel}, 
                       {"data", Data}]},
     F = fun() -> 
-		mnesia:read({connection, ClientId})
-	end,
+        mnesia:read({connection, ClientId})
+    end,
     case mnesia:transaction(F) of 
-		{atomic, []} ->
-		    {error, connection_not_found};
-		{atomic, [#connection{pid=Pid}]} -> 
-		    Pid ! {flush, Event},
-		    ok
-	end.
-	
+        {atomic, []} ->
+            {error, connection_not_found};
+        {atomic, [#connection{pid=Pid}]} -> 
+            Pid ! {flush, Event},
+            ok
+    end.
+    
 
 %%--------------------------------------------------------------------
 %% @spec  (string(), tuple()) -> ok | {error, channel_not_found} 
@@ -284,7 +280,7 @@ deliver_to_channel(Channel, Data) ->
         {atomic, [{channel, Channel, []}] } -> 
             ok;
         {atomic, [{channel, Channel, Ids}] } ->
-	    [send_event(connection_pid(ClientId), Event) || ClientId <- Ids],
+            [send_event(connection_pid(ClientId), Event) || ClientId <- Ids],
             ok;
         %% {atomic, [#channel{name=Name}]} ->
         %%     pg:esend(list_to_atom(Name), {flush, Event});
@@ -306,7 +302,7 @@ send_event(_, _) ->
 
 do(QLC) ->
     F = fun() ->
-		 qlc:e(QLC) end,
+         qlc:e(QLC) end,
     {atomic, Val} = mnesia:transaction(F),
     Val.
 
