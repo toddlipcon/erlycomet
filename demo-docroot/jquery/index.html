@@ -1,0 +1,41 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <script type="text/javascript" src="/jquery/jquery-1.2.2.min.js"></script>
+    <script type="text/javascript" src="/jquery/json.js"></script>
+    <script type="text/javascript" src="/jquery/jquery.comet.js"></script>
+    <script type="text/javascript">
+      function timeCallback(msg) {
+        $("#placeholder").text(msg.data);
+      };
+      function msgCallback(msg) {
+        $("#msgPlaceholder").text(msg.data);
+      };
+      function sendMessage() {
+        $.comet.publish("/test/msg",$("#msgInput").val());
+      };
+      $(document).ready(function() {
+        $.comet.init("/cometd");
+        $.comet.subscribe("/test/time", timeCallback);
+        $.comet.subscribe("/test/msg", msgCallback);
+      });
+    </script>
+    <title>Hello</title>
+  </head>
+  <body>
+    <h1>Hello</h1>
+
+    <h2>/test/time</h2>
+    <a href='javascript:$.comet.subscribe("/test/time", timeCallback);'>Subscribe</a>
+    <a href='javascript:$.comet.unsubscribe("/test/time");'>Unsubscribe</a>
+    <div id="placeholder">
+    </div>
+
+    <h2>/test/msg</h2>
+    <input id="msgInput"/><input type="submit" onclick='javascript:sendMessage();'/>
+    <div id="msgPlaceholder">
+    </div>
+    
+    
+  </body>
+</html>
