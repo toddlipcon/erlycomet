@@ -30,7 +30,7 @@
 %%%
 %%% @since 2007-11-11 by Roberto Saccon, Tait Larson
 %%%-------------------------------------------------------------------
--module(erlycomet_request).
+-module(erlycomet_request, [RpcChannel, RpcModule]).
 -author('telarson@gmail.com').
 -author('rsaccon@gmail.com').
 
@@ -176,23 +176,19 @@ process_cmd(Req, "/meta/unsubscribe", Struct, _) ->
     Subscription = get_json_map_val("subscription", Struct),
     process_cmd1(Req, "/meta/unsubscribe", ClientId, Subscription);
 
-
-%% Example custom RPC application
-%% TODO: needs to seperated from Comet core and made pluggable
-%%
-process_cmd(Req, "/rpc/test"=Channel, Struct, _) ->  
+process_cmd(Req, RpcChannel, Struct, _) ->  
     ClientId = get_json_map_val("clientId", Struct),
     Data = get_json_map_val("data", Struct),
     RpcId = get_json_map_val("id", Data),
     Method = list_to_atom(get_json_map_val("method", Data)),
     {array, Params} = get_json_map_val("params", Data),
-    Result = case catch apply(erlycomet_demo_rpc, Method, Params) of
+    Result = case catch apply(RpcModule, Method, Params) of
          {'EXIT', _} ->
              {struct, [{"result", null}, {"error", "RPC failed"}, {"id", RpcId}]};
          Value ->
              {struct, [{"result", Value}, {"error", null}, {"id", RpcId}]}
          end,
-    process_cmd1(Req, Channel, ClientId, Result);
+    process_cmd1(Req, RpcChannel, ClientId, Result);
     
 process_cmd(Req, Channel, Struct, _) ->
     ClientId = get_json_map_val("clientId", Struct),

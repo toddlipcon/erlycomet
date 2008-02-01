@@ -96,7 +96,8 @@ loop(Req) ->
     loop(Req, Req:get(method), Req:get(path), DocRoot).
 
 loop(Req, Method, "/cometd", _) ->
-	erlycomet_request:handle(Req, Method);
+    ErlyCometRequest = erlycomet_request:new("/rpc/test", erlycomet_demo_rpc),
+	ErlyCometRequest:handle(Req, Method);
     	
 loop(Req, 'GET', [$/ | Path], DocRoot) ->
     Req:serve_file(Path, DocRoot);
