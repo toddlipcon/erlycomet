@@ -190,6 +190,13 @@ process_cmd(Req, RpcChannel, Struct, _) ->
          end,
     process_cmd1(Req, RpcChannel, ClientId, Result);
     
+process_cmd(Req, [$/, $s, $e, $r, $v, $i, $c, $e, $/ | _Service] = Channel, Struct, _) ->
+    ClientId = get_json_map_val("clientId", Struct),
+    Result = {struct, [
+        {"result", "no services implemeted yet"}, 
+        {"error", null}]},
+    process_cmd1(Req, Channel, ClientId, Result);
+             
 process_cmd(Req, Channel, Struct, _) ->
     ClientId = get_json_map_val("clientId", Struct),
     Data = get_json_map_val("data", Struct),
@@ -233,10 +240,18 @@ process_cmd2(_Req, "/meta/unsubscribe", ClientId, Subscription) ->
         ok -> {struct, [{"successful", true}  | L]};
         _ ->  {struct, [{"successful", false}  | L]}
     end;
-
+    
+    
+process_cmd2(_Req, [$/, $s, $e, $r, $v, $i, $c, $e, $/ | _Service] = Channel, ClientId, Data) ->  
+    L = [{"channel", Channel}, {"clientId", ClientId}],
+    %% TODO: implement actual services
+    case erlycomet_api:deliver_to_connection(ClientId, Channel, Data) of
+        ok -> {struct, [{"successful", true}  | L]};
+        _ ->  {struct, [{"successful", false}  | L]}
+    end;    
+        
 process_cmd2(_Req, Channel, ClientId, Data) ->  
-    L = [{"channel", Channel}, 
-         {"clientId", ClientId}],
+    L = [{"channel", Channel}, {"clientId", ClientId}],
     case erlycomet_api:deliver_to_channel(Channel, Data) of
         ok -> {struct, [{"successful", true}  | L]};
         _ ->  {struct, [{"successful", false}  | L]}

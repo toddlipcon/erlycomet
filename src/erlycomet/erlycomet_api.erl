@@ -218,7 +218,7 @@ channels() ->
 %% @doc
 %% delivers data to one connection
 %% @end 
-%%--------------------------------------------------------------------    
+%%--------------------------------------------------------------------  
 deliver_to_connection(ClientId, Channel, Data) ->
     Event = {struct, [{"channel", Channel},  {"data", Data}]},
     F = fun() -> mnesia:read({connection, ClientId}) end,
@@ -240,7 +240,7 @@ deliver_to_connection(ClientId, Channel, Data) ->
 deliver_to_channel(Channel, Data) ->
     globbing(fun deliver_to_single_channel/2, Channel, Data).
     
- 
+
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
