@@ -176,7 +176,7 @@ process_cmd(Req, "/meta/unsubscribe", Struct, _) ->
     Subscription = get_json_map_val("subscription", Struct),
     process_cmd1(Req, "/meta/unsubscribe", ClientId, Subscription);
 
-process_cmd(Req, RpcChannel, Struct, _) ->  
+process_cmd(Req, RpcChannel, Struct, _) -> 
     ClientId = get_json_map_val("clientId", Struct),
     Data = get_json_map_val("data", Struct),
     RpcId = get_json_map_val("id", Data),
