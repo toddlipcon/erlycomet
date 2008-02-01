@@ -1,41 +1,57 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
 <html>
   <head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>ErlyComet jquery demo</title>
+	<link rel="stylesheet" href="/styles.css" type="text/css" media="screen">
     <script type="text/javascript" src="/jquery/jquery-1.2.2.min.js"></script>
     <script type="text/javascript" src="/jquery/json.js"></script>
     <script type="text/javascript" src="/jquery/jquery.comet.js"></script>
     <script type="text/javascript">
       function timeCallback(msg) {
-        $("#placeholder").text(msg.data);
+        $("#counter_output").text(msg.data);
       };
       function msgCallback(msg) {
-        $("#msgPlaceholder").text(msg.data);
+        $("#echo_output").text(msg.data);
       };
       function sendMessage() {
-        $.comet.publish("/test/msg",$("#msgInput").val());
+        $.comet.publish("/test/msg",$("#echo_input").val());
       };
       $(document).ready(function() {
         $.comet.init("/cometd");
-        $.comet.subscribe("/test/time", timeCallback);
         $.comet.subscribe("/test/msg", msgCallback);
       });
     </script>
     <title>Hello</title>
   </head>
-  <body>
-    <h1>Hello</h1>
+  <body>	
+	<h2>ErlyComet simple demos (<a href="http://plugins.jquery.com/project/Comet">jquery Comet plugin</a>)</h2>
 
-    <h2>/test/time</h2>
-    <a href='javascript:$.comet.subscribe("/test/time", timeCallback);'>Subscribe</a>
-    <a href='javascript:$.comet.unsubscribe("/test/time");'>Unsubscribe</a>
-    <div id="placeholder">
-    </div>
+	<h3>1. Super simple echo test - subscribe to own messages</h3>
+	<div class="container">
+   		<div id="echo_output" class="output" style="height:3ex"></div>
+   		<div class="input">
+    		<div>
+    			Input:
+				<input id="echo_input" type="text">
+				<input class="button" type="submit" onclick="javascript:sendMessage();" value="publish"/>
+    		</div>
+    	</div>
+   	</div>
 
-    <h2>/test/msg</h2>
-    <input id="msgInput"/><input type="submit" onclick='javascript:sendMessage();'/>
-    <div id="msgPlaceholder">
-    </div>
-    
-    
+	<h3>2. Epoch-time-mod-1000 counter</h3>
+	<div class="container">
+   		<div id="counter_output" class="output" style="height:3ex"></div>
+   		<div class="input">
+    		<div>
+       			Server side implemented counter:&nbsp;
+				<a href='javascript:$.comet.subscribe("/test/time", timeCallback);'>Subscribe</a>
+			    <a href='javascript:$.comet.unsubscribe("/test/time");'>Unsubscribe</a>
+     		</div>
+    	</div>
+   	</div>		
+
+	<p>For a demo with the dojo Comet library go to <a href="http://localhost:3000">http://localhost:3000</a></p>
   </body>
 </html>
