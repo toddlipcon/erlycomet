@@ -201,15 +201,12 @@ process_cmd(Req, Channel, Struct, _) ->
     
     
 process_cmd1(_Req, Channel, undefined) ->
-    {struct, [{"channel", Channel}, {"successful", false}]};    
-    
+    {struct, [{"channel", Channel}, {"successful", false}]};       
 process_cmd1(Req, Channel, Id) ->
     comment_filter(process_cmd2(Req, Channel, Id), erlycomet_api:connection(Id)).
 
-
 process_cmd1(_, Channel, undefined, _) ->   
-    {struct, [{"channel", Channel}, {"successful", false}]};
-    
+    {struct, [{"channel", Channel}, {"successful", false}]};  
 process_cmd1(Req, Channel, Id, Data) ->
     comment_filter(process_cmd2(Req, Channel, Id, Data), erlycomet_api:connection(Id)).
     
