@@ -64,9 +64,7 @@
 %%-------------------------------------------------------------------------
 add_connection(ClientId, Pid) -> 
     E = #connection{client_id=ClientId, pid=Pid},
-    F = fun() ->
-        mnesia:write(E)
-    end,
+    F = fun() -> mnesia:write(E) end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
         _ -> error
@@ -83,9 +81,7 @@ replace_connection(ClientId, Pid, NewState) ->
 
 replace_connection(ClientId, Pid, NewState, CommentFiltered) -> 
     E = #connection{client_id=ClientId, pid=Pid, comment_filtered=CommentFiltered, state=NewState},
-    F1 = fun() ->
-        mnesia:read({connection, ClientId})
-    end,
+    F1 = fun() -> mnesia:read({connection, ClientId}) end,
     {Status, F2} = case mnesia:transaction(F1) of
         {atomic, EA} ->
             case EA of
@@ -124,9 +120,7 @@ connections() ->
     do(qlc:q([X || X <-mnesia:table(connection)])).
   
 connection(ClientId) ->
-    F = fun() ->
-        mnesia:read({connection, ClientId})
-    end,
+    F = fun() -> mnesia:read({connection, ClientId}) end,
     case mnesia:transaction(F) of
         {atomic, Row} ->
             case Row of
@@ -157,9 +151,7 @@ connection_pid(ClientId) ->
 %% @end 
 %%--------------------------------------------------------------------  
 remove_connection(ClientId) ->
-    F = fun() ->
-        mnesia:delete({connection, ClientId})
-    end,
+    F = fun() -> mnesia:delete({connection, ClientId}) end,
     case mnesia:transaction(F) of
         {atomic, ok} -> ok;
         _ -> error
@@ -228,11 +220,8 @@ channels() ->
 %% @end 
 %%--------------------------------------------------------------------    
 deliver_to_connection(ClientId, Channel, Data) ->
-    Event = {struct, [{"channel", Channel}, 
-                      {"data", Data}]},
-    F = fun() -> 
-        mnesia:read({connection, ClientId})
-    end,
+    Event = {struct, [{"channel", Channel},  {"data", Data}]},
+    F = fun() -> mnesia:read({connection, ClientId}) end,
     case mnesia:transaction(F) of 
         {atomic, []} ->
             {error, connection_not_found};
@@ -290,11 +279,8 @@ globbing(Fun, Channel, Data) ->
 
 
 deliver_to_single_channel(Channel, Data) ->            
-    Event = {struct, [{"channel", Channel}, 
-                      {"data", Data}]},                    
-    F = fun() -> 
-        mnesia:read({channel, Channel})
-    end,
+    Event = {struct, [{"channel", Channel}, {"data", Data}]},                    
+    F = fun() -> mnesia:read({channel, Channel}) end,
     case mnesia:transaction(F) of 
         {atomic, [{channel, Channel, []}] } -> 
             ok;
@@ -313,8 +299,7 @@ send_event(_, _) ->
 
 
 do(QLC) ->
-    F = fun() ->
-         qlc:e(QLC) end,
+    F = fun() -> qlc:e(QLC) end,
     {atomic, Val} = mnesia:transaction(F),
     Val.
 
