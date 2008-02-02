@@ -36,7 +36,7 @@
 
 
 %% API
--export([handle/2]).
+-export([handle/1]).
 
 -include("erlycomet.hrl").
 
@@ -56,6 +56,10 @@
 %% @doc handle POST / GET Comet messages
 %% @end 
 %%--------------------------------------------------------------------
+handle(Req) ->
+    handle(Req, Req:get(method)).
+    
+        
 handle(Req, 'POST') ->
     handle(Req, Req:parse_post());
 handle(Req, 'GET') ->

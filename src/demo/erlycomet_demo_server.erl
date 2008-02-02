@@ -95,9 +95,9 @@ loop(Req) ->
 	DocRoot = filename:join([filename:dirname(code:which(?MODULE)),"..", "demo-docroot"]),
     loop(Req, Req:get(method), Req:get(path), DocRoot).
 
-loop(Req, Method, "/cometd", _) ->
+loop(Req, _, "/cometd", _) ->
     ErlyCometRequest = erlycomet_request:new(erlycomet_demo_rpc),
-	ErlyCometRequest:handle(Req, Method);
+	ErlyCometRequest:handle(Req);
     	
 loop(Req, 'GET', [$/ | Path], DocRoot) ->
     Req:serve_file(Path, DocRoot);
