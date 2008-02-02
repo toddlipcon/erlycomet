@@ -220,7 +220,7 @@ channels() ->
 %% @end 
 %%--------------------------------------------------------------------  
 deliver_to_connection(ClientId, Channel, Data) ->
-    Event = {struct, [{"channel", Channel},  {"data", Data}]},
+    Event = {struct, [{channel, Channel},  {data, Data}]},
     F = fun() -> mnesia:read({connection, ClientId}) end,
     case mnesia:transaction(F) of 
         {atomic, []} ->
@@ -246,7 +246,7 @@ deliver_to_channel(Channel, Data) ->
 %%--------------------------------------------------------------------
 
 globbing(Fun, Channel, Data) ->
-    case lists:reverse(Channel) of
+    case lists:reverse(binary_to_list(Channel)) of
         [$*, $* | T] ->
             lists:map(fun
                     (X) ->
@@ -279,7 +279,7 @@ globbing(Fun, Channel, Data) ->
 
 
 deliver_to_single_channel(Channel, Data) ->            
-    Event = {struct, [{"channel", Channel}, {"data", Data}]},                    
+    Event = {struct, [{channel, Channel}, {data, Data}]},                    
     F = fun() -> mnesia:read({channel, Channel}) end,
     case mnesia:transaction(F) of 
         {atomic, [{channel, Channel, []}] } -> 

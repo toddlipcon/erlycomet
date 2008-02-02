@@ -81,7 +81,7 @@ tick() ->
 	    ok
     after 1000 ->
 	    {_,Secs,_} = now(),
-        Channel = "/test/time",
+        Channel = <<"/test/time">>,
         Data = Secs rem 1000,
         erlycomet_api:deliver_to_channel(Channel, Data),
         tick()
@@ -96,7 +96,7 @@ loop(Req) ->
     loop(Req, Req:get(method), Req:get(path), DocRoot).
 
 loop(Req, Method, "/cometd", _) ->
-    ErlyCometRequest = erlycomet_request:new("/rpc/test", erlycomet_demo_rpc),
+    ErlyCometRequest = erlycomet_request:new(erlycomet_demo_rpc),
 	ErlyCometRequest:handle(Req, Method);
     	
 loop(Req, 'GET', [$/ | Path], DocRoot) ->

@@ -34,7 +34,7 @@
 -author('rsaccon@gmail.com').
 
 %% API
--export([delayed_echo/2]).
+-export([delayed_echo/3]).
 
 %%====================================================================
 %% API
@@ -45,8 +45,8 @@
 %% returns delayed the same value as it gets as input
 %% @end 
 %%--------------------------------------------------------------------
-delayed_echo(Text, Delay) ->
-    Timeout = list_to_integer(Delay) * 1000,
+delayed_echo(<<"/rpc/test">>, Text, Delay) ->
+    Timeout = list_to_integer(binary_to_list(Delay)) * 1000,
     receive
     after Timeout ->
     	Text
