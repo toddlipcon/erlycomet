@@ -7,7 +7,7 @@ div.container
 {
   background-color: #e0e0e0;
   border: 1px solid black; 
-  width: 45em;
+  width: 720px;
 }
 
 div.output
@@ -63,6 +63,7 @@ span.from
 
 span.alert
 {
+  color: #888888;
   font-style: italic;
 }
 

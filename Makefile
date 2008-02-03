@@ -9,6 +9,11 @@ MNESIA_DATA=mnesia-data
 NODE_NAME=$(APP_NAME)
 VSN=0.1
 
+# APP_ROOT=~/opensource/$(APP_NAME)
+# XD_DOJO_PATH=http://rsaccon.googlepages.com
+# DOJO_ROOT=~/opensource/dojo-release-1.0.1-src
+
+
 all:
 	$(ERL) -make
 
@@ -16,6 +21,22 @@ doc:
 	$(ERL) -pa `pwd`/ebin \
 	-noshell \
 	-run edoc_run application  "'$(APP_NAME)'" '"."' '[{def,{vsn,"$(VSN)"}}]'
+	
+
+# dojo-xd:
+# 	( cd $(DOJO_ROOT)/util/buildscripts && ./build.sh \
+# 	loader=xdomain \
+# 	xdDojoPath=$(XD_DOJO_PATH) \
+# 	profile=cometd \
+# 	releaseName=comet-xdomain-build \
+# 	internStrings=true \
+# 	copyTests=false \
+# 	cssOptimize=comments \
+# 	optimize=shrinksafe \
+# 	layerOptimize=shrinksafe \
+# 	action=release )	
+	
+
 
 clean:
 	rm -fv ebin/*.beam

@@ -1,0 +1,239 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+		"http://www.w3.org/TR/html4/strict.dtd">
+<html>
+	<head>
+		<title>Annotator/Figure Testing</title>
+<style type="text/css">
+@import "../../../dojo/resources/dojo.css";
+@Import "../../../dijit/themes/tundra/tundra.css";
+</style>
+		<link href="../resources/sketch.css" type="text/css" rel="stylesheet"/>
+		
+		<link rel="stylesheet" href="/styles.css" type="text/css" media="screen">
+		
+		<style type="text/css">
+			body {
+				background:#fff url("images/testsBodyBg.gif") repeat-x top left;
+				padding:1em 3em;
+			}
+			table { margin:0; width:100%;}
+			table tr td { padding:0; }
+			table tr td table { border:0; width:auto;}
+
+			#toolbar{ width:720px; }
+			#canvas{ width:720px; height:400px; background-color:#fff;border:1px solid #ccc; overflow:auto;position:relative;}
+		</style>
+		<script>var djConfig={ isDebug: true };</script>
+		<script src="../../../dojo/dojo.js"></script>
+		<script src="../Toolbar.js"></script>
+		<script>
+		    dojo.require("dojox.cometd");
+			dojo.require("dojox.sketch");
+			dojo.require("dojox.sketch.Slider");
+			dojo.require("dojox.sketch.LeadAnnotation");
+			dojo.require("dojox.sketch.UnderlineAnnotation");
+			dojo.require("dojox.sketch.SingleArrowAnnotation");
+			dojo.require("dojox.sketch.DoubleArrowAnnotation");
+			dojo.require("dojox.sketch.PreexistingAnnotation");
+			
+			var f, a, t;
+						
+			var room = {
+			    _last: "",
+			    _username: null,
+
+			    join: function(name){
+
+			        if(name == null || name.length==0 ){
+			            alert('Please enter a username!');
+			        }else{
+
+			            this._username=name;
+			            dojo.byId('join').className='hidden';
+			            dojo.byId('joined').className='';
+			            dojo.byId('phrase').focus();
+
+			            // subscribe and join
+				        dojox.cometd.startBatch();
+			            dojox.cometd.subscribe("/chat/demo", room, "_chat");
+			            dojox.cometd.publish("/chat/demo", { user: room._username, join: true, chat : room._username+" has joined"});
+				        dojox.cometd.endBatch();
+
+			            // handle cometd failures while in the room
+			            room._meta=dojo.subscribe("/cometd/meta",function(event){
+			                console.debug(event);   
+			                if (event.action=="handshake") {
+				                room._chat({data:{join:true,user:"SERVER",chat:"reconnected"}});
+			                    dojox.cometd.subscribe("/chat/demo", room, "_chat");
+			                } else if (event.action=="connect" && !event.successful) {
+			                    room._chat({data:{leave:true,user:"SERVER",chat:"disconnected!"}});
+				        }
+			            });
+			        }
+			    },
+
+			    leave: function(){
+			        if (room._username==null) {
+			            return;
+					}
+
+					if (room._meta) {
+			    		dojo.unsubscribe(room._meta);
+					}
+					room._meta=null;
+
+					dojox.cometd.startBatch();
+			    	dojox.cometd.unsubscribe("/chat/demo", room, "_chat");
+			    	dojox.cometd.publish("/chat/demo", { user: room._username, leave: true, chat : room._username+" has left"});
+					dojox.cometd.endBatch();
+
+			        // switch the input form
+			        dojo.byId('join').className='';
+			        dojo.byId('joined').className='hidden';
+			        dojo.byId('username').focus();
+			        room._username=null;
+			    },
+
+			    chat: function(text){
+			        if(!text || !text.length){ return false; }
+			        dojox.cometd.publish("/chat/demo", { user: room._username, chat: text});
+			    },
+
+			    _chat: function(message){
+			        var chat=dojo.byId('chat');
+			        if(!message.data){
+			            alert("bad message format "+message);
+			            return;
+			        }
+			
+					var instr = message.data.draw;			
+			        var from=message.data.user;
+			        var special=message.data.join || message.data.leave || message.data.draw;
+			        var text=message.data.chat;
+
+					if (instr) {
+						text = "drawing action: " + instr.cmdname;
+						f.update(instr);
+					} else if (!text){ return; }
+
+			        if( !special && from == room._last ){
+			            from="...";
+			        }else{
+			            room._last=from;
+			            from+=":";
+			        }
+
+			        if(special){
+			            chat.innerHTML += "<span class=\"alert\"><span class=\"from\">"+from+"&nbsp;</span><span class=\"text\">"+text+"</span></span><br/>";
+			            room._last="";
+			        }else{
+			            chat.innerHTML += "<span class=\"from\">"+from+"&nbsp;</span><span class=\"text\">"+text+"</span><br/>";
+			        } 
+			        chat.scrollTop = chat.scrollHeight - chat.clientHeight;    
+			    },
+
+			    _init: function(){
+			        dojo.byId('join').className='';
+			        dojo.byId('joined').className='hidden';
+			        dojo.byId('username').focus();
+
+			        var element=dojo.byId('username');
+			        element.setAttribute("autocomplete","OFF"); 
+			        dojo.connect(element, "onkeyup", function(e){   
+			            if(e.keyCode == dojo.keys.ENTER){
+			                room.join(dojo.byId('username').value);
+			                return false;
+			            }
+			            return true;
+				    });
+
+			        element=dojo.byId('joinB');
+			        element.onclick = function(){
+			            room.join(dojo.byId('username').value);
+			            return false;
+				    }
+
+			        element=dojo.byId('phrase');
+			        element.setAttribute("autocomplete","OFF");
+			        dojo.connect(element, "onkeyup", function(e){   
+			            if(e.keyCode == dojo.keys.ENTER){
+			                room.chat(dojo.byId('phrase').value);
+			                dojo.byId('phrase').value='';
+			                return false;
+			            }
+			            return true;
+				    });
+
+			        element=dojo.byId('sendB');
+			        element.onclick = function(){
+			        	room.chat(dojo.byId('phrase').value);
+			        	dojo.byId('phrase').value='';
+					}
+
+			        element=dojo.byId('leaveB');
+			        element.onclick = function(){
+			        	room.leave();
+					}
+			    } 
+			};
+			
+
+			function sketch_init(){
+				var ta=dojox.sketch;
+				f=new ta.Figure();
+				dojo.connect(f, "_mu", function(){ dojo.byId("output").value=f.serialize(); });
+
+				t=ta.makeToolbar(dojo.byId("toolbar"), f);
+
+				//	test loading from an SVG file
+				dojo.xhrGet({
+					url:"annotation.svg",
+					preventCache:true,
+					load:function(data, ioArgs){
+						f.load(dojox.xml.DomParser.parse(data), dojo.byId("canvas"));
+						dojo.byId("output").value=f.serialize();
+					}
+				});
+			}	
+			
+			dojo.addOnLoad(function(){
+			   dojox.cometd.init("http://localhost:3000/cometd");
+			});
+			dojo.addOnLoad(room, "_init");
+			dojo.addOnLoad(function(){
+			   sketch_init();
+			});			
+
+			dojo.addOnUnload(room,"leave");	
+			dojo.addOnUnload(function(){
+			   dojox.cometd.disconnect();
+			});		
+			
+		</script>
+	</head>
+	<body class="tundra">
+		<h1>Annotator/Figure Testing Platform</h1>
+		<p>This is a generic test to create a figure from an existing SVG file, to edit that figure, and to test the undo stack. Double click a shape to set new text for it.</p>
+		
+		<div class="sketch_container">
+			<div id="toolbar"></div>
+			<div id="canvas"></div>
+		</div>
+		<div class="container">
+			<div id="chat" class="output" style="height:10ex"></div>
+			<div class="input">
+				<div id="join" >
+	   				Username:&nbsp;<input id="username" type="text"><input id="joinB" class="button" type="submit" name="join" value="Join"/>
+	  			</div>
+	   			<div id="joined" class="hidden">
+	   				Chat:&nbsp;<input id="phrase" type="text">
+	   				<input id="sendB" class="button" type="submit" name="join" value="Send">
+	   				<input id="leaveB" class="button" type="submit" name="join" value="Leave">
+	   			</div>
+	   		</div>
+		</div>
+
+		<h2>Serialized output</h2>
+		<textarea id="output" style="width:100%;height:180px;overflow:auto;font-size:0.8em;"></textarea>
+	</body>
+</html>

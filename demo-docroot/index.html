@@ -122,6 +122,7 @@
 		            alert("bad message format "+message);
 		            return;
 		        }
+				
 		        var from=message.data.user;
 		        var special=message.data.join || message.data.leave;
 		        var text=message.data.chat;
@@ -245,7 +246,10 @@
    		</div>
 	</div>
 	
-	<p>For a demo with the jquery Comet library <a href="/jquery">click here</a></p>	
+	<p>
+		For a demo with the jquery Comet library <a href="/jquery">click here</a> or
+		try <a href="/dojox/sketch/tests/sketch-comet.html">collaborative drawing</a>
+	</p>	
 </body>
 
 

@@ -80,7 +80,7 @@ handle(Req, [{"message", Msg} | _]) ->
             ok;
         [done] -> 
             ok;
-        Body -> 
+        Body ->
             Req:ok({"text/json", json_encode(Body)})
     end;        
 handle(Req, _) ->
@@ -270,9 +270,7 @@ comment_filter(Data, #connection{comment_filtered=CF}=_Row) ->
     comment_filter(Data, CF);
 comment_filter(Data, true) ->
     {comment, Data};
-comment_filter(Data, false) ->
-    Data;
-comment_filter(Data, undefined) ->
+comment_filter(Data, _) ->
     Data.
      
                 

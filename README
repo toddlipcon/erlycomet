@@ -1,1 +1,75 @@
 Mochiweb:  rev. 47 (beam files are in priv/ebin)
+
+
+Collaborating drawing
+=====================
+highly experimental !
+
+1) install dojo, dojox and dijit (from SVN) into demo-docroot
+
+2) copy demo-docroot/sketch_comet-move_me_to-dojox_sketch_tests.html into demo-docroot/dojox/sketch/tests
+
+3) apply this patch to demo-docroot/dojox/sketch/Figure.js:
+
+--- /Users/rsaccon/opensource/dojo-trunk/dojox/sketch/Figure.js
++++ Figure.js
+@@ -231,6 +231,11 @@
+ 			shape.onDblClick(e);
+ 		}
+ 	};
++	
++	p.update=function(state){
++	  this.history.apply(null, state.before, state.after);  
++	};
++	
+ 
+ 	p.onCreateShape=function(shape){};
+ 	p.onBeforeCreateShape=function(shape){};
+
+
+
+4) apply this patch to demo-docroot/dojox/sketch/UndoStack.js:
+
+--- /Users/rsaccon/opensource/dojo-trunk/dojox/sketch/UndoStack.js
++++ UndoStack.js
+@@ -11,16 +11,19 @@
+ 			this._steps=[];
+ 			this._undoedSteps=[];
+ 		},
+-		apply: function(state, from, to){
++		apply: function(state, from, to){	    
+ 			//	the key here is to neutrally move from one state to another.
+ 			//	we let the individual functions (i.e. undo and redo) actually
+ 			//	determine the from and to; all we do here is implement it.
+-
++		    
+ 			//	check whether this is a fullText step
+ 			if(!from && !to && state.fullText){
+ 				this.figure.setValue(state.fullText);
+ 				return;
+ 			}
++			
++			console.info("apply: " + from.shapeText);
++			console.info("apply: " + to.shapeText);
+ 
+ 			var fromText=from.shapeText;
+ 			var toText=to.shapeText;
+@@ -77,10 +80,16 @@
+ 					shapeText:after
+ 				}
+ 			};
+-			//console.log('dojox.sketch history add',state);
++
+ 			this._steps.push(state);
+ 			this._undoedSteps = [];
++						
++			dojox.cometd.publish("/chat/demo", {user: room._username, draw: state});
++			
++			console.info("add: " + state.before.shapeText);
++			console.info("add: " + state.after.shapeText);
+ 		},
++				
+ 		destroy: function(){},
+ 		undo: function(){
+ 			var state=this._steps.pop();
+
