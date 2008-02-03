@@ -1,7 +1,7 @@
 Mochiweb:  rev. 47 (beam files are in priv/ebin)
 
 
-Collaborating drawing
+Collaborative drawing
 =====================
 1) install dojo, dojox and dijit (from SVN) into demo-docroot
 

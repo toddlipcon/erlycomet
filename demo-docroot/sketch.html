@@ -181,7 +181,8 @@
 			function sketch_init(){
 				var ta=dojox.sketch;
 				f=new ta.Figure();
-				dojo.connect(f, "_mu", function(){ dojo.byId("output").value=f.serialize(); });
+				
+				//dojo.connect(f, "_mu", function(){ dojo.byId("output").value=f.serialize(); });
 
 				t=ta.makeToolbar(dojo.byId("toolbar"), f);
 
@@ -191,28 +192,25 @@
 					preventCache:true,
 					load:function(data, ioArgs){
 						f.load(dojox.xml.DomParser.parse(data), dojo.byId("canvas"));
-						dojo.byId("output").value=f.serialize();
 					}
 				});
 			}	
 			
 			dojo.addOnLoad(function(){
-			   dojox.cometd.init("http://localhost:3000/cometd");
-			});
-			dojo.addOnLoad(room, "_init");
-			dojo.addOnLoad(function(){
-			   sketch_init();
-			});			
+			    dojox.cometd.init("http://localhost:3000/cometd");
+				room._init();
+				sketch_init();
+			});		
 
-			dojo.addOnUnload(room,"leave");	
 			dojo.addOnUnload(function(){
-			   dojox.cometd.disconnect();
+				room.leave();
+				dojox.cometd.disconnect();
 			});		
 			
 		</script>
 	</head>
 	<body class="tundra">
-		<h1>Annotator/Figure Testing Platform</h1>
+		<h1>Annotator/Figure Testing Platform - Cometified for collaborative drawing</h1>
 		<p>This is a generic test to create a figure from an existing SVG file, to edit that figure, and to test the undo stack. Double click a shape to set new text for it.</p>
 		
 		<div class="sketch_container">
@@ -232,8 +230,5 @@
 	   			</div>
 	   		</div>
 		</div>
-
-		<h2>Serialized output</h2>
-		<textarea id="output" style="width:100%;height:180px;overflow:auto;font-size:0.8em;"></textarea>
 	</body>
 </html>
