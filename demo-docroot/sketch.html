@@ -4,10 +4,10 @@
 	<head>
 		<title>Annotator/Figure Testing</title>
 <style type="text/css">
-@import "../../../dojo/resources/dojo.css";
-@Import "../../../dijit/themes/tundra/tundra.css";
+@import "dojo/resources/dojo.css";
+@Import "dijit/themes/tundra/tundra.css";
 </style>
-		<link href="../resources/sketch.css" type="text/css" rel="stylesheet"/>
+		<link href="dojox/sketch/resources/sketch.css" type="text/css" rel="stylesheet"/>
 		
 		<link rel="stylesheet" href="/styles.css" type="text/css" media="screen">
 		
@@ -24,8 +24,8 @@
 			#canvas{ width:720px; height:400px; background-color:#fff;border:1px solid #ccc; overflow:auto;position:relative;}
 		</style>
 		<script>var djConfig={ isDebug: true };</script>
-		<script src="../../../dojo/dojo.js"></script>
-		<script src="../Toolbar.js"></script>
+		<script src="dojo/dojo.js"></script>
+		<script src="dojox/sketch/Toolbar.js"></script>
 		<script>
 		    dojo.require("dojox.cometd");
 			dojo.require("dojox.sketch");
@@ -187,7 +187,7 @@
 
 				//	test loading from an SVG file
 				dojo.xhrGet({
-					url:"annotation.svg",
+					url:"dojox/sketch/tests/annotation.svg",
 					preventCache:true,
 					load:function(data, ioArgs){
 						f.load(dojox.xml.DomParser.parse(data), dojo.byId("canvas"));
