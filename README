@@ -1,18 +1,23 @@
 Mochiweb:  rev. 47 (beam files are in priv/ebin)
 
 
-Collaborative drawing
-=====================
+Collaborative drawing Example demo
+==================================
 1) install dojo, dojox and dijit (from SVN) into demo-docroot
+   (because it won't work with dojo from AOL CDN)
 
-2) add this to dojox.sketch.UndoStack.add() :
+2) apply this patch todojox.sketch.UndoStack.add:
 
-  dojox.cometd.publish("/chat/demo", {user: room._username, draw: state});
++++ UndoStack.js
+@@ -78,6 +78,9 @@
+ 				}
+ 			};
+ 			//console.log('dojox.sketch history add',state);
++			
++			dojox.cometd.publish("/chat/demo", {user: room._username, draw: state});
++			
+ 			this._steps.push(state);
+ 			this._undoedSteps = [];
+ 		},
 
-
-3) Add this public method to dojox.sketch.Figure() :
-
-  p.update=function(state){
-    this.history.apply(null, state.before, state.after);  
-  };
 

@@ -37,6 +37,22 @@
 			dojo.require("dojox.sketch.PreexistingAnnotation");
 			
 			var f, a, t;
+
+			function sketch_init(){
+				var ta=dojox.sketch;
+				f=new ta.Figure();
+
+				t=ta.makeToolbar(dojo.byId("toolbar"), f);
+
+				//	test loading from an SVG file
+				dojo.xhrGet({
+					url:"dojox/sketch/tests/annotation.svg",
+					preventCache:true,
+					load:function(data, ioArgs){
+						f.load(dojox.xml.DomParser.parse(data), dojo.byId("canvas"));
+					}
+				});
+			}			
 						
 			var room = {
 			    _last: "",
@@ -113,7 +129,8 @@
 
 					if (instr) {
 						text = "drawing action: " + instr.cmdname;
-						f.update(instr);
+						// here follows the "magic" drawing command
+						f.history.apply(null, instr.before, instr.after);  					
 					} else if (!text){ return; }
 
 			        if( !special && from == room._last ){
@@ -175,29 +192,10 @@
 			        	room.leave();
 					}
 			    } 
-			};
-			
-
-			function sketch_init(){
-				var ta=dojox.sketch;
-				f=new ta.Figure();
-				
-				//dojo.connect(f, "_mu", function(){ dojo.byId("output").value=f.serialize(); });
-
-				t=ta.makeToolbar(dojo.byId("toolbar"), f);
-
-				//	test loading from an SVG file
-				dojo.xhrGet({
-					url:"dojox/sketch/tests/annotation.svg",
-					preventCache:true,
-					load:function(data, ioArgs){
-						f.load(dojox.xml.DomParser.parse(data), dojo.byId("canvas"));
-					}
-				});
-			}	
+			};	
 			
 			dojo.addOnLoad(function(){
-			    dojox.cometd.init("http://localhost:3000/cometd");
+			    dojox.cometd.init("/cometd");
 				room._init();
 				sketch_init();
 			});		

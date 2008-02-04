@@ -66,22 +66,17 @@ handle(Req, 'GET') ->
     handle(Req, Req:parse_qs());    
 handle(Req, [{"message", Msg}, {"jsonp", Callback} | _]) ->
     case process_bayeux_msg(Req, json_decode(Msg), Callback) of
-        done -> 
-            ok;
-        [done] -> 
-            ok;
+        done -> ok;
+        [done] -> ok;
         Body -> 
             Resp = callback_wrapper(json_encode(Body), Callback),       
             Req:ok({"text/javascript", Resp})   
     end;       
 handle(Req, [{"message", Msg} | _]) ->
     case process_bayeux_msg(Req, json_decode(Msg), undefined) of
-        done -> 
-            ok;
-        [done] -> 
-            ok;
-        Body ->
-            Req:ok({"text/json", json_encode(Body)})
+        done -> ok;
+        [done] -> ok;
+        Body -> Req:ok({"text/json", json_encode(Body)})
     end;        
 handle(Req, _) ->
     Req:not_found().
@@ -94,10 +89,6 @@ handle(Req, _) ->
 process_bayeux_msg(Req, JsonObj, Callback) ->
     case JsonObj of   
         Array when is_list(Array) -> 
-            % {array, [ process_msg(Req, M, Callback) || M <- Content ]},
-            % should be refactored.
-            % ugly hack. somewhat dangerous as it expects all or none of the messages
-            % to be marked at comment filtered.
             Out  = [ process_msg(Req, X, Callback) || X <- Array ],
             Out1 = [ Msg || {comment, Msg} <- Out],
             case Out1 of 
