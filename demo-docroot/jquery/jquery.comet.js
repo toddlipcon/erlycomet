@@ -62,7 +62,7 @@
                  $.comet._bPolling = true;
                  
                  this._send($.comet._sUrl, oMsg, function(sReturn){
-                         var oReturn = eval('(' + sReturn + ')');
+                         var oReturn = $.comet._eval(sReturn);
                          $.comet._bPolling = false;
                          $.comet.deliver(oReturn);
                          $.comet._oTransport.closeTunnel();
@@ -121,7 +121,7 @@
                  //default callback will check advice, deliver messages, and reconnect
                  var fCallback = (fCallback) ? fCallback : function(sReturn)
                  {
-                     var oReturn = eval("(" + sReturn + ")");
+                     var oReturn = $.comet._eval(sReturn);
                      
                      $.comet.deliver(oReturn);
                      
@@ -212,7 +212,7 @@
              
              this._finishInit = function(sReturn)
              {
-                 var oReturn = eval('(' + sReturn + ')');//[0];
+                 var oReturn = $.comet._eval(sReturn);//[0];
                  
                  if(oReturn.advice)
                      $.comet._advice = oReturn.advice;
@@ -358,6 +358,14 @@
 
                      }
              };
+
+             this._eval = function(maybeObj) {
+                 if (typeof(maybeObj) == "string") {
+                     return eval('(' + maybeObj + ')');
+                 } else {
+                     return maybeObj;
+                 
+             };}
          };
      
  })(jQuery);
