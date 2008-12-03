@@ -219,12 +219,28 @@ process_cmd2(_, <<$/, $s, $e, $r, $v, $i, $c, $e, $/, _/binary>> = Channel, Clie
     end;   
              
 process_cmd2(_, Channel, ClientId, Data) ->  
-    L = [{channel, Channel}, {clientId, ClientId}],
-    case erlycomet_api:deliver_to_channel(Channel, Data) of
-        ok -> {struct, [{successful, true}  | L]};
-        _ ->  {struct, [{successful, false}  | L]}
+    case authenticate_channel_write(ClientId, Channel) of
+      allow -> try_deliver_channel(Channel, ClientId, Data);
+      _ -> result_struct(Channel, ClientId, false)
     end.
 
+authenticate_channel_write(ClientId, Channel) ->
+    case catch CustomAppModule:authenticate_channel_write(ClientId, Channel) of
+      allow -> allow;
+      deny ->  deny;
+      {'EXIT', {undef, [{CustomAppModule, authenticate_channel_write, _} | _]}} ->
+               allow % default allow to maintain past behavior
+    end.
+
+try_deliver_channel(Channel, ClientId, Data) ->
+    case erlycomet_api:deliver_to_channel(Channel, Data) of
+        ok -> result_struct(Channel, ClientId, true);
+        _ ->  result_struct(Channel, ClientId, false)
+    end.
+
+result_struct(Channel, ClientId, Result) when is_boolean(Result) ->
+    L = [{channel, Channel}, {clientId, ClientId}],
+    {struct, [{successful, Result}  | L]}.
 
 json_decode(Str) ->
     mochijson2:decode(comment_filter_decode(Str)).
