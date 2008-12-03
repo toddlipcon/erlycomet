@@ -14,8 +14,11 @@ VSN=0.1
 # DOJO_ROOT=~/opensource/dojo-release-1.0.1-src
 
 
-all:
+all: builddeps
 	$(ERL) -make
+
+builddeps:
+	cd deps/mochiweb && make
 
 doc:	
 	$(ERL) -pa `pwd`/ebin \
@@ -48,7 +51,7 @@ clean-doc:
 	rm -fv doc/*.css
 
 run:	all
-	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
+	$(ERL) -pa `pwd`/ebin -pa `pwd`/deps/mochiweb/ebin \
 	-boot start_sasl \
 	-config erlycomet_demo.config \
 	-s $(APP_NAME) \
@@ -58,7 +61,7 @@ run:	all
 # You can load demo page from this server to do comet x-domain access to default server at port 3000.
 #
 runx:	all
-	$(ERL) -pa `pwd`/ebin -pa `pwd`/priv/ebin \
+	$(ERL) -pa `pwd`/ebin -pa `pwd`/deps/mochiweb/ebin \
 	-boot start_sasl \
 	-s $(APP_NAME) \
 	-erlycomet_demo http_port 3001 \
