@@ -59,12 +59,27 @@
 handle(Req) ->
     handle(Req, Req:get(method)).
     
-        
+-record(parsed_req, {message, jsonp}).
+
+%% Extract args from the message in an order-independent way
+parse_args(Args) -> parse_args(Args, #parsed_req{}).
+
+parse_args([{"message", Msg} | Rest], Acc) ->
+    parse_args(Rest, Acc#parsed_req{message = Msg});
+parse_args([{"jsonp", Val} | Rest], Acc) ->
+    parse_args(Rest, Acc#parsed_req{jsonp = Val});
+parse_args([{"callback", Val} | Rest], Acc) ->
+    parse_args(Rest, Acc#parsed_req{jsonp = Val});
+parse_args([_Other | Rest], Acc) ->
+    parse_args(Rest, Acc);
+parse_args([], Acc) -> Acc.
+
 handle(Req, 'POST') ->
-    handle(Req, Req:parse_post());
+    handle(Req, parse_args(Req:parse_post()));
 handle(Req, 'GET') ->
-    handle(Req, Req:parse_qs());    
-handle(Req, [{"message", Msg}, {"jsonp", Callback} | _]) ->
+    handle(Req, parse_args(Req:parse_qs()));
+handle(Req, #parsed_req{message = Msg, jsonp = Callback})
+  when Msg =/= undefined, Callback =/= undefined ->
     case process_bayeux_msg(Req, json_decode(Msg), Callback) of
         done -> ok;
         [done] -> ok;
@@ -72,13 +87,15 @@ handle(Req, [{"message", Msg}, {"jsonp", Callback} | _]) ->
             Resp = callback_wrapper(json_encode(Body), Callback),       
             Req:ok({"text/javascript", Resp})   
     end;       
-handle(Req, [{"message", Msg} | _]) ->
+handle(Req, #parsed_req{message = Msg})
+  when Msg =/= undefined ->
     case process_bayeux_msg(Req, json_decode(Msg), undefined) of
         done -> ok;
         [done] -> ok;
         Body -> Req:ok({"text/json", json_encode(Body)})
     end;        
-handle(Req, _) ->
+handle(Req, _Parsed) ->
+    io:format("Not found for parsed: ~p~n", [_Parsed]),
     Req:not_found().
 
 
